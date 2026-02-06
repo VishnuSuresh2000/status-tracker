@@ -1,3 +1,4 @@
+# Fixed CI build
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import SQLModel, Field, create_engine, Session, select, Relationship
@@ -51,8 +52,12 @@ class Task(SQLModel, table=True):
     interval_minutes: Optional[float] = Field(default=60.0)
 
     # Relationships
-    phases: List["Phase"] = Relationship(back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    comments: List["Comment"] = Relationship(back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    phases: List["Phase"] = Relationship(
+        back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    comments: List["Comment"] = Relationship(
+        back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class Phase(SQLModel, table=True):
@@ -250,7 +255,7 @@ def recalculate_task_progress(task_id: int, session: Session) -> None:
     task = session.get(Task, task_id)
     if task:
         task.progress_percent = calculate_task_progress(task_id, session)
-        
+
         # Sync legacy status field for UI column sorting
         if task.progress_percent >= 100:
             task.status = "done"
@@ -258,7 +263,7 @@ def recalculate_task_progress(task_id: int, session: Session) -> None:
             task.status = "in_progress"
         else:
             task.status = "todo"
-            
+
         session.add(task)
         session.commit()
 
@@ -597,8 +602,7 @@ def read_comments(
 
 @app.get("/notifications/", response_model=List[Notification])
 def read_notifications(
-    unread_only: bool = False,
-    session: Session = Depends(get_session)
+    unread_only: bool = False, session: Session = Depends(get_session)
 ):
     """Get all notifications."""
     if unread_only:
@@ -610,18 +614,20 @@ def read_notifications(
 def mark_as_read(
     notification_id: int,
     session: Session = Depends(get_session),
-    token: str = Depends(verify_token)
+    token: str = Depends(verify_token),
 ):
     """Mark a notification as read."""
     if not mark_notif_as_read(notification_id, session):
         raise HTTPException(status_code=404, detail="Notification not found")
-    return {"message": "Notification marked as read", "notification_id": notification_id}
+    return {
+        "message": "Notification marked as read",
+        "notification_id": notification_id,
+    }
 
 
 @app.post("/notifications/read-all", response_model=dict)
 def mark_all_read(
-    session: Session = Depends(get_session),
-    token: str = Depends(verify_token)
+    session: Session = Depends(get_session), token: str = Depends(verify_token)
 ):
     """Mark all notifications as read."""
     count = mark_all_notifs_as_read(session)
