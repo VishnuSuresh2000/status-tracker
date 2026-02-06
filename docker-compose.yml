@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: status-tracker-app
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - HOST_NAME=${HOST_NAME}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.status-tracker.rule=Host(status-tracker.${HOST_NAME})"
+      - "traefik.http.routers.status-tracker.entrypoints=https"
+      - "traefik.http.routers.status-tracker.tls=true"
+      - "traefik.http.routers.status-tracker.service=status-tracker@docker"
+      - "traefik.http.services.status-tracker.loadbalancer.server.port=8000"
+
+  redis:
+    image: redis:alpine
+    container_name: status-tracker-redis
+    restart: unless-stopped
+    networks:
+      - traefik
+
+  worker:
+    build: .
+    container_name: status-tracker-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+    volumes:
+      - ./data:/app/data
+    networks:
+      - traefik
+    command: ["uv", "run", "python", "worker.py"]
+
+networks:
+  traefik:
+    external: true

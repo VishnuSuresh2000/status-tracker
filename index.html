@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .modal-content { max-height: 85vh; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Task Status Tracker</h1>
+            <div class="relative">
+                <button onclick="toggleNotifications()" class="relative p-2 bg-white rounded-lg shadow hover:bg-gray-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span id="notificationBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                </button>
+                <!-- Notification Panel -->
+                <div id="notificationPanel" class="absolute right-0 mt-2 w-screen max-w-xs sm:w-80 bg-white rounded-lg shadow-xl hidden z-50 mx-4 sm:mx-0">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="font-semibold text-gray-800">Notifications</h3>
+                        <button onclick="markAllAsRead()" class="text-sm text-blue-600 hover:text-blue-800">Mark all read</button>
+                    </div>
+                    <div id="notificationList" class="max-h-64 overflow-y-auto">
+                        <p class="p-4 text-gray-500 text-sm">No notifications</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Task Form -->
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow-md mb-8 border-t-4 border-blue-600">
+            <h2 class="text-xl font-semibold mb-4">Add New Task</h2>
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <input type="text" id="taskName" placeholder="Task Name" class="w-full sm:flex-1 p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                <input type="number" id="taskInterval" placeholder="Interval (min)" class="w-full sm:w-32 p-2 border rounded" value="60">
+                <button onclick="addTask()" class="bg-blue-600 text-white px-6 py-2 rounded font-medium hover:bg-blue-700 whitespace-nowrap transition-colors">Add Task</button>
+            </div>
+        </div>
+
+        <!-- Task Columns -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Todo Column -->
+            <div>
+                <h3 class="font-bold text-gray-600 mb-4 uppercase tracking-wider flex items-center">
+                    <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span> To Do
+                </h3>
+                <div id="todoList" class="space-y-4"></div>
+            </div>
+            <!-- In Progress Column -->
+            <div>
+                <h3 class="font-bold text-blue-600 mb-4 uppercase tracking-wider flex items-center">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span> In Progress
+                </h3>
+                <div id="inProgressList" class="space-y-4"></div>
+            </div>
+            <!-- Done Column -->
+            <div>
+                <h3 class="font-bold text-green-600 mb-4 uppercase tracking-wider flex items-center">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Done
+                </h3>
+                <div id="doneList" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div id="detailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full flex flex-col modal-content">
+            <div class="p-6 border-b flex justify-between items-start">
+                <div>
+                    <h3 id="modalTaskName" class="text-2xl font-bold text-gray-800">Task Details</h3>
+                    <div id="modalTaskMeta" class="flex gap-2 mt-1"></div>
+                </div>
+                <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <!-- Description -->
+                <section>
+                    <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight mb-2">Description</h4>
+                    <p id="modalDescription" class="text-gray-700 whitespace-pre-wrap"></p>
+                </section>
+
+                <!-- Flow Chart -->
+                <section id="flowChartSection" class="hidden">
+                    <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight mb-2">Workflow</h4>
+                    <div id="mermaidChart" class="bg-gray-50 rounded border p-4 flex justify-center"></div>
+                </section>
+
+                <!-- Phases & Todos -->
+                <section>
+                    <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight mb-3">Phases & Checklists</h4>
+                    <div id="phasesList" class="space-y-4"></div>
+                </section>
+
+                <!-- Comments -->
+                <section>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight">Audit Log</h4>
+                        <button onclick="addCommentPrompt()" class="text-xs text-blue-600 hover:underline">+ Add Note</button>
+                    </div>
+                    <div id="commentsList" class="space-y-2 bg-gray-50 p-4 rounded border max-h-48 overflow-y-auto"></div>
+                </section>
+            </div>
+
+            <div class="p-4 border-t bg-gray-50 flex justify-between items-center">
+                <div class="flex gap-2">
+                    <button id="modalActionBtn" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"></button>
+                    <button onclick="deleteCurrentTask()" class="text-red-600 px-4 py-2 rounded text-sm font-medium hover:bg-red-50 border border-red-200">Delete Task</button>
+                </div>
+                <span id="modalTaskId" class="text-xs text-gray-400"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Basic Info Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[60] p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Edit Basic Info</h3>
+            <input type="hidden" id="editTaskId">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Task Name</label>
+                <input type="text" id="editTaskName" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Interval (minutes)</label>
+                <input type="number" id="editTaskInterval" class="w-full p-2 border rounded">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeEditModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">Cancel</button>
+                <button onclick="saveTaskEdit()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/tasks/';
+        let currentTaskId = null;
+
+        async function fetchTasks() {
+            try {
+                const response = await fetch(API_URL);
+                const tasks = await response.json();
+                
+                const lists = {
+                    todo: document.getElementById('todoList'),
+                    in_progress: document.getElementById('inProgressList'),
+                    done: document.getElementById('doneList')
+                };
+
+                // Clear lists
+                Object.values(lists).forEach(list => list.innerHTML = '');
+
+                tasks.forEach(task => {
+                    const card = createTaskCard(task);
+                    // Standard status routing, fallback to todo
+                    const container = lists[task.status] || lists.todo;
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                console.error("Fetch failed:", e);
+            }
+        }
+
+        function createTaskCard(task) {
+            const div = document.createElement('div');
+            div.className = 'bg-white p-4 rounded-lg shadow hover:shadow-md transition-all border-l-4 ' + getStatusColor(task.status) + ' cursor-pointer group';
+            div.onclick = (e) => {
+                if (!e.target.closest('button')) openTaskDetails(task.id);
+            };
+            
+            const progress = task.progress_percent || 0;
+            const priorityColors = {
+                'low': 'bg-gray-100 text-gray-600',
+                'medium': 'bg-blue-50 text-blue-600',
+                'high': 'bg-orange-50 text-orange-600',
+                'critical': 'bg-red-50 text-red-600'
+            };
+            const pColor = priorityColors[task.priority] || priorityColors.medium;
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 break-words group-hover:text-blue-600 transition-colors">${task.name}</h4>
+                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${pColor}">${task.priority || 'medium'}</span>
+                </div>
+                
+                ${task.description ? `<p class="text-xs text-gray-500 line-clamp-2 mb-3">${task.description}</p>` : ''}
+                
+                <div class="mb-3">
+                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                        <span>Progress</span>
+                        <span>${progress}%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-blue-500 h-full rounded-full progress-bar" style="width: ${progress}%"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-2 border-t border-gray-50">
+                    <div class="flex gap-2">
+                        <button onclick="event.stopPropagation(); openEditModal(${task.id}, '${task.name.replace(/'/g, "\\'")}', ${task.interval_minutes})" 
+                                class="text-[10px] font-bold text-gray-400 hover:text-blue-600 flex items-center uppercase transition-colors">
+                            Edit
+                        </button>
+                    </div>
+                    <span class="text-[10px] font-mono text-gray-300">#${task.id}</span>
+                </div>
+            `;
+            return div;
+        }
+
+        function getStatusColor(status) {
+            if (status === 'todo') return 'border-gray-200';
+            if (status === 'in_progress') return 'border-blue-500';
+            if (status === 'done') return 'border-green-500';
+            return 'border-gray-200';
+        }
+
+        async function openTaskDetails(taskId) {
+            currentTaskId = taskId;
+            try {
+                const response = await fetch(`${API_URL}${taskId}`);
+                const task = await response.json();
+                
+                document.getElementById('modalTaskName').textContent = task.name;
+                document.getElementById('modalTaskId').textContent = `Task ID: ${task.id}`;
+                document.getElementById('modalDescription').textContent = task.description || "No description provided.";
+                
+                // Tags and Priority
+                const meta = document.getElementById('modalTaskMeta');
+                meta.innerHTML = `<span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">${task.priority}</span>`;
+                if (task.context_tags) {
+                    task.context_tags.split(',').forEach(tag => {
+                        meta.innerHTML += `<span class="text-xs text-gray-500 px-2 py-0.5 rounded-full bg-gray-100">#${tag.trim()}</span>`;
+                    });
+                }
+
+                // Render Phases
+                const phasesContainer = document.getElementById('phasesList');
+                if (!task.phases || task.phases.length === 0) {
+                    phasesContainer.innerHTML = '<p class="text-xs text-gray-400 italic">No phases defined for this task.</p>';
+                } else {
+                    phasesContainer.innerHTML = task.phases.sort((a,b) => a.order - b.order).map(phase => `
+                        <div class="border rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+                                <h5 class="text-sm font-bold text-gray-700">${phase.name}</h5>
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${getPhaseStatusClass(phase.status)}">${phase.status.replace('_', ' ')}</span>
+                            </div>
+                            <div class="p-3 space-y-2">
+                                ${phase.todos.map(todo => `
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" ${todo.status === 'done' ? 'checked' : ''} 
+                                               onchange="toggleTodo(${todo.id}, this.checked)"
+                                               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                                        <span class="text-sm ${todo.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}">${todo.name}</span>
+                                    </div>
+                                `).join('') || '<p class="text-xs text-gray-400 italic">No items</p>'}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // Render Comments
+                const commentsContainer = document.getElementById('commentsList');
+                if (!task.comments || task.comments.length === 0) {
+                    commentsContainer.innerHTML = '<p class="text-xs text-gray-400 italic">No log entries yet.</p>';
+                } else {
+                    commentsContainer.innerHTML = task.comments.reverse().map(comment => `
+                        <div class="text-[11px] border-b border-gray-100 pb-2 mb-2 last:border-0 last:mb-0 last:pb-0">
+                            <div class="flex justify-between font-bold text-gray-500 mb-0.5">
+                                <span>${comment.author.toUpperCase()}</span>
+                                <span>${new Date(comment.timestamp).toLocaleString()}</span>
+                            </div>
+                            <p class="text-gray-700">${comment.text}</p>
+                        </div>
+                    `).join('');
+                }
+
+                // Mermaid Chart
+                const flowSection = document.getElementById('flowChartSection');
+                if (task.flow_chart) {
+                    flowSection.classList.remove('hidden');
+                    const chartDiv = document.getElementById('mermaidChart');
+                    chartDiv.innerHTML = `<pre class="mermaid">${task.flow_chart}</pre>`;
+                    mermaid.run({ nodes: [chartDiv] });
+                } else {
+                    flowSection.classList.add('hidden');
+                }
+
+                // Action Button Logic
+                const btn = document.getElementById('modalActionBtn');
+                if (task.status === 'todo') {
+                    btn.textContent = "Start Task";
+                    btn.onclick = () => updateStatus(task.id, 'in_progress', true);
+                    btn.classList.remove('hidden');
+                } else if (task.status === 'in_progress') {
+                    btn.textContent = "Finish Task";
+                    btn.onclick = () => updateStatus(task.id, 'done', true);
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+
+                document.getElementById('detailsModal').classList.remove('hidden');
+            } catch (e) {
+                console.error("Details fetch failed:", e);
+            }
+        }
+
+        function getPhaseStatusClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-green-100 text-green-700';
+                case 'in_progress': return 'bg-blue-100 text-blue-700';
+                case 'blocked': return 'bg-red-100 text-red-700';
+                default: return 'bg-gray-100 text-gray-700';
+            }
+        }
+
+        async function toggleTodo(todoId, isDone) {
+            const status = isDone ? 'done' : 'todo';
+            try {
+                await fetch(`/todos/${todoId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                // Refresh modal data to show propagation changes
+                if (currentTaskId) openTaskDetails(currentTaskId);
+                fetchTasks();
+            } catch (e) {
+                console.error("Todo update failed:", e);
+            }
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.add('hidden');
+            currentTaskId = null;
+        }
+
+        async function addTask() {
+            const name = document.getElementById('taskName').value;
+            const interval = document.getElementById('taskInterval').value;
+            if (!name) return alert('Name is required');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, interval_minutes: parseFloat(interval) })
+                });
+                
+                if (response.status === 401) {
+                    alert("Unauthorized: Only the Assistant can create tasks via API.");
+                    return;
+                }
+
+                document.getElementById('taskName').value = '';
+                fetchTasks();
+            } catch (e) {
+                console.error("Add failed:", e);
+            }
+        }
+
+        async function updateStatus(taskId, status, fromModal = false) {
+            try {
+                await fetch(`${API_URL}${taskId}?status=${status}`, { method: 'PATCH' });
+                if (fromModal) openTaskDetails(taskId);
+                fetchTasks();
+            } catch (e) {
+                console.error("Status update failed:", e);
+            }
+        }
+
+        async function deleteCurrentTask() {
+            if (!currentTaskId || !confirm('Are you sure you want to delete this task?')) return;
+            try {
+                await fetch(`${API_URL}${currentTaskId}`, { method: 'DELETE' });
+                closeDetailsModal();
+                fetchTasks();
+            } catch (e) {
+                console.error("Delete failed:", e);
+            }
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+            await fetch(`${API_URL}${taskId}`, { method: 'DELETE' });
+            fetchTasks();
+        }
+
+        function openEditModal(taskId, name, interval) {
+            document.getElementById('editTaskId').value = taskId;
+            document.getElementById('editTaskName').value = name;
+            document.getElementById('editTaskInterval').value = interval;
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        async function saveTaskEdit() {
+            const taskId = document.getElementById('editTaskId').value;
+            const name = document.getElementById('editTaskName').value;
+            const interval = document.getElementById('editTaskInterval').value;
+
+            if (!name) return alert('Name is required');
+
+            await fetch(`${API_URL}${taskId}?name=${encodeURIComponent(name)}&interval_minutes=${interval}`, { method: 'PUT' });
+            closeEditModal();
+            fetchTasks();
+            if (currentTaskId == taskId) openTaskDetails(taskId);
+        }
+
+        async function addCommentPrompt() {
+            const text = prompt("Enter log message:");
+            if (!text || !currentTaskId) return;
+            
+            await fetch(`${API_URL}${currentTaskId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, author: 'user' })
+            });
+            openTaskDetails(currentTaskId);
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditModal();
+        });
+        document.getElementById('detailsModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDetailsModal();
+        });
+
+        // Notification functions
+        let notificationsOpen = false;
+
+        async function fetchNotifications() {
+            try {
+                const response = await fetch('/notifications/?unread_only=true');
+                const notifications = await response.json();
+                updateNotificationUI(notifications);
+            } catch (e) {
+                console.error('Failed to fetch notifications:', e);
+            }
+        }
+
+        function updateNotificationUI(notifications) {
+            const badge = document.getElementById('notificationBadge');
+            const list = document.getElementById('notificationList');
+            
+            if (notifications.length > 0) {
+                badge.textContent = notifications.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+            
+            if (notifications.length === 0) {
+                list.innerHTML = '<p class="p-4 text-gray-500 text-sm">No notifications</p>';
+            } else {
+                list.innerHTML = notifications.map(n => `
+                    <div class="p-3 border-b hover:bg-gray-50">
+                        <div class="flex justify-between items-start">
+                            <p class="text-sm font-medium text-gray-800">${n.task_name}</p>
+                            <span class="text-xs text-gray-400">${new Date(n.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-1">${n.message}</p>
+                        <span class="inline-block mt-2 text-[10px] px-2 py-1 rounded ${n.notification_type === 'reminder' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${n.notification_type}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function toggleNotifications() {
+            const panel = document.getElementById('notificationPanel');
+            notificationsOpen = !notificationsOpen;
+            if (notificationsOpen) {
+                panel.classList.remove('hidden');
+                fetchNotifications();
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        async function markAllAsRead() {
+            await fetch('/notifications/read-all', { method: 'POST' });
+            fetchNotifications();
+        }
+
+        // Close notification panel when clicking outside
+        document.addEventListener('click', function(e) {
+            const panel = document.getElementById('notificationPanel');
+            const bell = e.target.closest('button');
+            if (!notificationsOpen) return;
+            if (!bell && !panel.contains(e.target)) {
+                panel.classList.add('hidden');
+                notificationsOpen = false;
+            }
+        });
+
+        // Initialize Mermaid
+        mermaid.initialize({ startOnLoad: false });
+
+        // Initial fetch
+        fetchTasks();
+        fetchNotifications();
+        // Refresh every 30 seconds
+        setInterval(fetchTasks, 30000);
+        setInterval(fetchNotifications, 30000);
+    </script>
+</body>
+</html>
