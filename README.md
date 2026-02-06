@@ -1,6 +1,6 @@
 # Status Tracker
 
-A FastAPI-based task management system with background worker monitoring, real-time notifications, and a visual Kanban-style dashboard. Built through human-AI collaboration.
+A FastAPI-based task management system with background worker monitoring, real-time notifications, and a visual Kanban-style dashboard. Built through human-AI collaboration between **Ruto** (AI) and **Vishnu Suresh** (Human).
 
 ## Features
 
