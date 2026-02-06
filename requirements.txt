@@ -4,5 +4,7 @@ uvicorn
 redis
 requests
 pytest
+pytest-playwright
+playwright
 httpx
 python-dotenv

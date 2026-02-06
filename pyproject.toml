@@ -18,7 +18,18 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-playwright>=0.7.0",
+    "playwright>=1.50.0",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+
+[tool.pytest.ini_options.playwright]
+browser_channel = "chromium"
+headless = true
