@@ -17,8 +17,8 @@ from notifications import (
     create_db_and_tables as create_notification_tables,
     get_unread_notifications,
     get_all_notifications,
-    mark_notification_as_read,
-    mark_all_notifications_as_read,
+    mark_notification_as_read as mark_notif_as_read,
+    mark_all_notifications_as_read as mark_all_notifs_as_read,
 )
 
 # Database setup
@@ -46,9 +46,9 @@ class Task(SQLModel, table=True):
     last_ping: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # Legacy fields (for backwards compatibility)
-    status: Optional[str] = Field(default=None)  # Deprecated: use phases instead
-    interval_minutes: Optional[float] = Field(default=None)  # Deprecated
+    # Legacy fields
+    status: Optional[str] = Field(default="todo")
+    interval_minutes: Optional[float] = Field(default=60.0)
 
     # Relationships
     phases: List["Phase"] = Relationship(back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -188,7 +188,7 @@ class TaskCreate(TaskBase):
 
 class TaskRead(TaskBase):
     id: int
-    status: Optional[str]
+    status: str
     progress_percent: int
     last_ai_summary: Optional[str]
     last_ping: datetime
@@ -218,22 +218,12 @@ def create_db_and_tables():
 def calculate_task_progress(task_id: int, session: Session) -> int:
     """
     Calculate task progress based on phases and todos.
-
-    Algorithm:
-    1. Each phase has equal weight (100% / num_phases)
-    2. Phase progress = (completed_todos / total_todos) * phase_weight
-    3. If phase is completed, it contributes full phase_weight
-    4. If phase is blocked, it contributes 0
     """
     task = session.get(Task, task_id)
-    if not task:
+    if not task or not task.phases:
         return 0
 
     phases = task.phases
-
-    if not phases:
-        return 0
-
     phase_weight = 100 / len(phases)
     total_progress = 0.0
 
@@ -245,10 +235,7 @@ def calculate_task_progress(task_id: int, session: Session) -> int:
             if todos:
                 completed = sum(1 for t in todos if t.status == "done")
                 total_progress += phase_weight * (completed / len(todos))
-        elif phase.status == "blocked":
-            pass  # Contributes 0
         elif phase.status == "not_started":
-            # Calculate based on todo progress even if phase not marked in_progress
             todos = phase.todos
             if todos:
                 completed = sum(1 for t in todos if t.status == "done")
@@ -295,6 +282,7 @@ def update_phase_status_from_todos(phase_id: int, session: Session) -> None:
     done_count = sum(1 for t in todos if t.status == "done")
     in_progress_count = sum(1 for t in todos if t.status == "in_progress")
 
+    old_status = phase.status
     if done_count == len(todos):
         new_status = "completed"
     elif done_count > 0 or in_progress_count > 0:
@@ -306,9 +294,12 @@ def update_phase_status_from_todos(phase_id: int, session: Session) -> None:
         phase.status = new_status
         session.add(phase)
         session.commit()
+        create_system_comment(
+            phase.task_id,
+            f"Phase '{phase.name}' status changed from '{old_status}' to '{phase.status}'",
+            session,
+        )
 
-    # Always recalculate task progress when a todo status changes, 
-    # even if the phase status itself didn't change
     recalculate_task_progress(phase.task_id, session)
 
 
@@ -379,7 +370,6 @@ def create_task(
     token: str = Depends(verify_token),
 ):
     """Create a task with optional nested phases and todos."""
-    # Create the task
     task = Task(
         name=task_data.name,
         description=task_data.description,
@@ -396,8 +386,6 @@ def create_task(
     session.commit()
     session.refresh(task)
 
-    # Create phases and todos
-    assert task.id is not None, "Task ID should be set after commit"
     for phase_data in task_data.phases or []:
         phase = Phase(
             task_id=task.id,
@@ -409,8 +397,6 @@ def create_task(
         session.commit()
         session.refresh(phase)
 
-        # Create todos for this phase
-        assert phase.id is not None, "Phase ID should be set after commit"
         for todo_data in phase_data.todos or []:
             todo = Todo(
                 phase_id=phase.id,
@@ -421,15 +407,10 @@ def create_task(
 
         session.commit()
         session.refresh(phase)
-
-        # Auto-update phase status based on todos
         update_phase_status_from_todos(phase.id, session)
 
-    # Calculate initial progress
     recalculate_task_progress(task.id, session)
     session.refresh(task)
-
-    # Create system comment
     create_system_comment(task.id, f"Task '{task.name}' created", session)
 
     return task
@@ -438,8 +419,7 @@ def create_task(
 @app.get("/tasks/", response_model=List[TaskRead])
 def read_tasks(session: Session = Depends(get_session)):
     """Get all tasks with their phases, todos, and comments."""
-    tasks = session.exec(select(Task)).all()
-    return tasks
+    return session.exec(select(Task)).all()
 
 
 @app.get("/tasks/{task_id}", response_model=TaskRead)
@@ -532,7 +512,6 @@ def update_todo(
     session.commit()
     session.refresh(todo)
 
-    # Log change
     phase = session.get(Phase, todo.phase_id)
     if phase:
         create_system_comment(
@@ -540,7 +519,6 @@ def update_todo(
             f"Todo '{todo.name}' status changed from '{old_status}' to '{todo.status}'",
             session,
         )
-        # Propagate status up
         update_phase_status_from_todos(todo.phase_id, session)
 
     return todo
@@ -564,20 +542,16 @@ def update_phase(
     session.commit()
     session.refresh(phase)
 
-    # If marked completed, mark all todos as done
     if phase.status == "completed":
         update_todos_when_phase_completed(phase_id, session)
 
-    # Log change
     create_system_comment(
         phase.task_id,
         f"Phase '{phase.name}' status changed from '{old_status}' to '{phase.status}'",
         session,
     )
 
-    # Recalculate task progress
     recalculate_task_progress(phase.task_id, session)
-
     return phase
 
 
@@ -622,31 +596,40 @@ def read_comments(
 
 
 @app.get("/notifications/", response_model=List[Notification])
-def read_notifications(unread_only: bool = False):
+def read_notifications(
+    unread_only: bool = False,
+    session: Session = Depends(get_session)
+):
     """Get all notifications."""
     if unread_only:
-        return get_unread_notifications()
-    return get_all_notifications()
+        return get_unread_notifications(session)
+    return get_all_notifications(session)
 
 
-@app.patch("/notifications/{notification_id}/read", response_model=Notification)
-def mark_as_read(notification_id: int):
+@app.patch("/notifications/{notification_id}/read", response_model=dict)
+def mark_as_read(
+    notification_id: int,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token)
+):
     """Mark a notification as read."""
-    notification = mark_notification_as_read(notification_id)
-    if not notification:
+    if not mark_notif_as_read(notification_id, session):
         raise HTTPException(status_code=404, detail="Notification not found")
-    return notification
+    return {"message": "Notification marked as read", "notification_id": notification_id}
 
 
 @app.post("/notifications/read-all", response_model=dict)
-def mark_all_read():
+def mark_all_read(
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token)
+):
     """Mark all notifications as read."""
-    mark_all_notifications_as_read()
-    return {"message": "All notifications marked as read"}
+    count = mark_all_notifs_as_read(session)
+    return {"message": f"{count} notifications marked as read"}
 
 
 @app.get("/notifications/unread-count", response_model=dict)
-def get_unread_count():
+def get_unread_count(session: Session = Depends(get_session)):
     """Get count of unread notifications."""
-    notifications = get_unread_notifications()
-    return {"count": len(notifications)}
+    notifications = get_unread_notifications(session)
+    return {"unread_count": len(notifications)}
