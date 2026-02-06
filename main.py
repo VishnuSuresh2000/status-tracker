@@ -188,6 +188,7 @@ class TaskCreate(TaskBase):
 
 class TaskRead(TaskBase):
     id: int
+    status: Optional[str]
     progress_percent: int
     last_ai_summary: Optional[str]
     last_ping: datetime
@@ -536,7 +537,7 @@ def update_todo(
     if phase:
         create_system_comment(
             phase.task_id,
-            f"Todo '{todo.name}' updated from '{old_status}' to '{todo.status}'",
+            f"Todo '{todo.name}' status changed from '{old_status}' to '{todo.status}'",
             session,
         )
         # Propagate status up
@@ -570,7 +571,7 @@ def update_phase(
     # Log change
     create_system_comment(
         phase.task_id,
-        f"Phase '{phase.name}' updated from '{old_status}' to '{phase.status}'",
+        f"Phase '{phase.name}' status changed from '{old_status}' to '{phase.status}'",
         session,
     )
 
@@ -601,6 +602,18 @@ def add_comment(
     session.commit()
     session.refresh(comment)
     return comment
+
+
+@app.get("/tasks/{task_id}/comments", response_model=List[CommentRead])
+def read_comments(
+    task_id: int,
+    session: Session = Depends(get_session),
+):
+    """Get all comments for a task."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task.comments
 
 
 # ============================================================================
