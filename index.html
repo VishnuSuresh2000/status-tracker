@@ -9,6 +9,11 @@
     <style>
         .progress-bar { transition: width 0.5s ease-in-out; }
         .modal-content { max-height: 85vh; }
+        @keyframes pulse-red {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+        .pulse-red { animation: pulse-red 2s infinite; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
@@ -172,11 +177,21 @@
 
         function createTaskCard(task) {
             const div = document.createElement('div');
-            div.className = 'bg-white p-4 rounded-lg shadow hover:shadow-md transition-all border-l-4 ' + getStatusColor(task.status) + ' cursor-pointer group';
+            div.className = 'bg-white p-4 rounded-lg shadow hover:shadow-md transition-all border-l-4 ' + getStatusColor(task.status) + ' cursor-pointer group relative flex flex-col h-full';
             div.onclick = (e) => {
                 if (!e.target.closest('button')) openTaskDetails(task.id);
             };
             
+            // Ping Indicator Logic
+            let pingIndicator = '';
+            if (task.unread_reminder_count > 0) {
+                const colorClass = task.unread_reminder_count === 1 ? 'bg-yellow-400' : 'bg-red-500 pulse-red';
+                const tooltip = task.unread_reminder_count === 1 ? '1 unread ping' : `${task.unread_reminder_count} unread pings`;
+                pingIndicator = `
+                    <div class="absolute -top-2 -left-2 h-4 w-4 ${colorClass} rounded-full border-2 border-white shadow-sm z-10" title="${tooltip}"></div>
+                `;
+            }
+
             const progress = task.progress_percent || 0;
             const priorityColors = {
                 'low': 'bg-gray-100 text-gray-600',
@@ -186,15 +201,34 @@
             };
             const pColor = priorityColors[task.priority] || priorityColors.medium;
 
+            // Agent & Skills Logic
+            const agentDisplay = task.agent_name ? 
+                `<div class="flex items-center gap-1 text-[10px] text-gray-500 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>${task.agent_name}</span>
+                 </div>` : '';
+
+            const skillsDisplay = task.skills ? 
+                `<div class="flex flex-wrap gap-1 mb-3">
+                    ${task.skills.split(',').slice(0, 3).map(s => `<span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] rounded border border-indigo-100">${s.trim()}</span>`).join('')}
+                    ${task.skills.split(',').length > 3 ? `<span class="text-[9px] text-gray-400">+${task.skills.split(',').length - 3}</span>` : ''}
+                 </div>` : '';
+
             div.innerHTML = `
+                ${pingIndicator}
+                ${agentDisplay}
                 <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 break-words group-hover:text-blue-600 transition-colors">${task.name}</h4>
-                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${pColor}">${task.priority || 'medium'}</span>
+                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 break-words group-hover:text-blue-600 transition-colors text-sm">${task.name}</h4>
+                    <span class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${pColor} ml-2 flex-shrink-0">${task.priority || 'medium'}</span>
                 </div>
                 
-                ${task.description ? `<p class="text-xs text-gray-500 line-clamp-2 mb-3">${task.description}</p>` : ''}
+                ${task.description ? `<p class="text-xs text-gray-500 line-clamp-2 mb-2">${task.description}</p>` : ''}
                 
-                <div class="mb-3">
+                ${skillsDisplay}
+
+                <div class="mt-auto pt-2">
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
                         <span>Progress</span>
                         <span>${progress}%</span>
@@ -204,7 +238,7 @@
                     </div>
                 </div>
 
-                <div class="flex justify-between items-center pt-2 border-t border-gray-50">
+                <div class="flex justify-between items-center pt-2 mt-2 border-t border-gray-50">
                     <div class="flex gap-2">
                         <button onclick="event.stopPropagation(); openEditModal(${task.id}, '${task.name.replace(/'/g, "\\'")}', ${task.interval_minutes})" 
                                 class="text-[10px] font-bold text-gray-400 hover:text-blue-600 flex items-center uppercase transition-colors">
@@ -234,13 +268,29 @@
                 document.getElementById('modalTaskId').textContent = `Task ID: ${task.id}`;
                 document.getElementById('modalDescription').textContent = task.description || "No description provided.";
                 
-                // Tags and Priority
+                // Tags, Priority, Agent, Skills
                 const meta = document.getElementById('modalTaskMeta');
-                meta.innerHTML = `<span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">${task.priority}</span>`;
-                if (task.context_tags) {
-                    task.context_tags.split(',').forEach(tag => {
-                        meta.innerHTML += `<span class="text-xs text-gray-500 px-2 py-0.5 rounded-full bg-gray-100">#${tag.trim()}</span>`;
+                meta.innerHTML = `<span class="text-xs uppercase font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 mr-2">${task.priority}</span>`;
+                
+                if (task.agent_name) {
+                    meta.innerHTML += `<span class="text-xs text-gray-600 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 mr-2 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        ${task.agent_name}
+                    </span>`;
+                }
+
+                if (task.skills) {
+                    task.skills.split(',').forEach(skill => {
+                        meta.innerHTML += `<span class="text-xs text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 mr-1">${skill.trim()}</span>`;
                     });
+                }
+
+                if (task.context_tags) {
+                    meta.innerHTML += '<div class="mt-2">';
+                    task.context_tags.split(',').forEach(tag => {
+                        meta.innerHTML += `<span class="text-xs text-gray-500 px-2 py-0.5 rounded-full bg-gray-100 mr-1">#${tag.trim()}</span>`;
+                    });
+                    meta.innerHTML += '</div>';
                 }
 
                 // Render Phases
@@ -250,17 +300,23 @@
                 } else {
                     phasesContainer.innerHTML = task.phases.sort((a,b) => a.order - b.order).map(phase => `
                         <div class="border rounded-lg overflow-hidden">
-                            <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                                <h5 class="text-sm font-bold text-gray-700">${phase.name}</h5>
-                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${getPhaseStatusClass(phase.status)}">${phase.status.replace('_', ' ')}</span>
+                            <div class="bg-gray-50 px-4 py-3 border-b">
+                                <div class="flex justify-between items-center mb-1">
+                                    <h5 class="text-sm font-bold text-gray-700">${phase.name}</h5>
+                                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${getPhaseStatusClass(phase.status)}">${phase.status.replace('_', ' ')}</span>
+                                </div>
+                                ${phase.description ? `<p class="text-xs text-gray-500">${phase.description}</p>` : ''}
                             </div>
-                            <div class="p-3 space-y-2">
+                            <div class="p-3 space-y-3">
                                 ${phase.todos.map(todo => `
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex items-start gap-3">
                                         <input type="checkbox" ${todo.status === 'done' ? 'checked' : ''} 
                                                onchange="toggleTodo(${todo.id}, this.checked)"
-                                               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                                        <span class="text-sm ${todo.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}">${todo.name}</span>
+                                               class="w-4 h-4 mt-0.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0">
+                                        <div>
+                                            <span class="text-sm block ${todo.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}">${todo.name}</span>
+                                            ${todo.description ? `<p class="text-xs text-gray-400 mt-0.5">${todo.description}</p>` : ''}
+                                        </div>
                                     </div>
                                 `).join('') || '<p class="text-xs text-gray-400 italic">No items</p>'}
                             </div>
@@ -289,8 +345,17 @@
                 if (task.flow_chart) {
                     flowSection.classList.remove('hidden');
                     const chartDiv = document.getElementById('mermaidChart');
+                    // Reset div content to raw definition
                     chartDiv.innerHTML = `<pre class="mermaid">${task.flow_chart}</pre>`;
-                    mermaid.run({ nodes: [chartDiv] });
+                    chartDiv.removeAttribute('data-processed'); // Clear processed flag
+                    
+                    // Re-run mermaid
+                    try {
+                        await mermaid.run({ nodes: [chartDiv] });
+                    } catch (err) {
+                        console.error('Mermaid render error:', err);
+                        chartDiv.innerHTML = `<p class="text-red-500 text-xs">Error rendering chart</p><pre class="text-[10px] overflow-auto mt-2">${task.flow_chart}</pre>`;
+                    }
                 } else {
                     flowSection.classList.add('hidden');
                 }

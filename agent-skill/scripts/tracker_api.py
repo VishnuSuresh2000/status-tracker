@@ -61,11 +61,14 @@ class StatusTrackerAPI:
         return self._request("PATCH", f"/todos/{todo_id}", data={"status": status})
 
     def add_comment(
-        self, task_id: int, text: str, author: str = "agent"
+        self, task_id: int, text: str, author: str = "sub-agent"
     ) -> Optional[Dict[str, Any]]:
         return self._request(
             "POST", f"/tasks/{task_id}/comments", data={"text": text, "author": author}
         )
+
+    def batch_report(self, task_id: int, reports: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        return self._request("POST", f"/tasks/{task_id}/batch-report", data=reports)
 
 
 if __name__ == "__main__":
@@ -102,6 +105,11 @@ if __name__ == "__main__":
         comment = api.add_comment(int(sys.argv[2]), sys.argv[3])
         if comment is not None:
             print(json.dumps(comment, indent=2))
+    elif command == "batch" and len(sys.argv) > 3:
+        reports = json.loads(sys.argv[3])
+        result = api.batch_report(int(sys.argv[2]), reports)
+        if result is not None:
+            print(json.dumps(result, indent=2))
     else:
         print(f"Unknown command or missing args: {command}")
         sys.exit(1)

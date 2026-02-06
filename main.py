@@ -47,6 +47,10 @@ class Task(SQLModel, table=True):
     last_ai_summary: Optional[str] = Field(default=None)
     last_ping: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # New fields for Rich Info
+    agent_name: str = Field(default="Main Agent")
+    skills: Optional[str] = Field(default=None)
 
     # Legacy fields
     status: str = Field(default="todo")
@@ -67,6 +71,7 @@ class Phase(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_id: int = Field(foreign_key="tasks.id", index=True)
     name: str = Field(index=True)
+    description: Optional[str] = Field(default=None) # New field
     status: str = Field(
         default="not_started"
     )  # not_started, in_progress, completed, blocked
@@ -84,6 +89,7 @@ class Todo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     phase_id: int = Field(foreign_key="phases.id", index=True)
     name: str = Field(index=True)
+    description: Optional[str] = Field(default=None) # New field
     status: str = Field(default="todo")  # todo, in_progress, done
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -97,7 +103,7 @@ class Comment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_id: int = Field(foreign_key="tasks.id", index=True)
     text: str
-    author: str = Field(default="system")  # system, user, agent
+    author: str = Field(default="system")  # system, user, agent, sub-agent
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
@@ -112,6 +118,7 @@ class Comment(SQLModel, table=True):
 # Todo Schemas
 class TodoBase(BaseModel):
     name: str
+    description: Optional[str] = None
     status: str = "todo"
 
 
@@ -135,6 +142,7 @@ class TodoRead(TodoBase):
 # Phase Schemas
 class PhaseBase(BaseModel):
     name: str
+    description: Optional[str] = None
     status: str = "not_started"
     order: int = 0
 
@@ -186,6 +194,8 @@ class TaskBase(BaseModel):
     flow_chart: Optional[str] = None
     context_tags: Optional[str] = None
     definition_of_done: Optional[str] = None
+    agent_name: str = "Main Agent"
+    skills: Optional[str] = None
 
 
 class TaskCreate(TaskBase):
@@ -201,6 +211,7 @@ class TaskRead(TaskBase):
     created_at: datetime
     phases: List[PhaseRead] = []
     comments: List[CommentRead] = []
+    unread_reminder_count: int = 0
 
     class Config:
         from_attributes = True
@@ -251,6 +262,18 @@ def migrate_null_statuses():
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+
+def get_unread_reminder_count(task_id: int, session: Session) -> int:
+    """Count unread reminder notifications for a specific task."""
+    statement = (
+        select(Notification)
+        .where(Notification.task_id == task_id)
+        .where(Notification.is_read == False)
+        .where(Notification.notification_type == "reminder")
+    )
+    results = session.exec(statement).all()
+    return len(results)
 
 
 def calculate_task_progress(task_id: int, session: Session) -> int:
@@ -429,6 +452,8 @@ def create_task(
         flow_chart=task_data.flow_chart,
         context_tags=task_data.context_tags,
         definition_of_done=task_data.definition_of_done,
+        agent_name=task_data.agent_name,
+        skills=task_data.skills,
         progress_percent=0,
         status="todo",
     )
@@ -440,6 +465,7 @@ def create_task(
         phase = Phase(
             task_id=task.id,
             name=phase_data.name,
+            description=phase_data.description,
             status=phase_data.status,
             order=phase_data.order,
         )
@@ -451,6 +477,7 @@ def create_task(
             todo = Todo(
                 phase_id=phase.id,
                 name=todo_data.name,
+                description=todo_data.description,
                 status=todo_data.status,
             )
             session.add(todo)
@@ -469,7 +496,20 @@ def create_task(
 @app.get("/tasks/", response_model=List[TaskRead])
 def read_tasks(session: Session = Depends(get_session)):
     """Get all tasks with their phases, todos, and comments."""
-    return session.exec(select(Task)).all()
+    tasks = session.exec(select(Task)).all()
+    results = []
+    for task in tasks:
+        # Create TaskRead object manually to include calculated field
+        task_data = task.model_dump()
+        task_data["phases"] = [p.model_dump(include={"id", "task_id", "name", "status", "order", "created_at", "todos"}) for p in task.phases]
+        # Ensure todos are also dumped
+        for p_idx, phase in enumerate(task.phases):
+            task_data["phases"][p_idx]["todos"] = [t.model_dump() for t in phase.todos]
+        
+        task_data["comments"] = [c.model_dump() for c in task.comments]
+        task_data["unread_reminder_count"] = get_unread_reminder_count(task.id, session)
+        results.append(TaskRead(**task_data))
+    return results
 
 
 @app.get("/tasks/{task_id}", response_model=TaskRead)
@@ -478,7 +518,16 @@ def read_task(task_id: int, session: Session = Depends(get_session)):
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    
+    task_data = task.model_dump()
+    task_data["phases"] = [p.model_dump() for p in task.phases]
+    for p_idx, phase in enumerate(task.phases):
+        task_data["phases"][p_idx]["todos"] = [t.model_dump() for t in phase.todos]
+    
+    task_data["comments"] = [c.model_dump() for c in task.comments]
+    task_data["unread_reminder_count"] = get_unread_reminder_count(task.id, session)
+    
+    return TaskRead(**task_data)
 
 
 @app.patch("/tasks/{task_id}", response_model=TaskRead)
@@ -542,6 +591,83 @@ def edit_task(
     session.commit()
     session.refresh(task)
     return task
+
+
+@app.post("/tasks/{task_id}/batch-report", response_model=dict)
+def batch_report(
+    task_id: int,
+    reports: List[dict],
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
+):
+    """Process multiple updates (comments or status updates) in one transaction."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    for report in reports:
+        # 1. Handle Comments
+        if "comment" in report:
+            comment = Comment(
+                task_id=task_id,
+                text=report["comment"],
+                author=report.get("author", "sub-agent"),
+            )
+            session.add(comment)
+        
+        # 2. Handle Todo Status Updates
+        if "todo_id" in report and "status" in report:
+            todo = session.get(Todo, report["todo_id"])
+            if todo:
+                old_status = todo.status
+                todo.status = report["status"]
+                session.add(todo)
+                
+                # Propagate to phase
+                update_phase_status_from_todos(todo.phase_id, session)
+                
+                create_system_comment(
+                    task_id,
+                    f"Todo '{todo.name}' status updated to '{todo.status}' via batch report",
+                    session
+                )
+
+        # 3. Handle Phase Status Updates
+        if "phase_id" in report and "status" in report:
+            phase = session.get(Phase, report["phase_id"])
+            if phase:
+                old_status = phase.status
+                phase.status = report["status"]
+                session.add(phase)
+                
+                if phase.status == "completed":
+                    update_todos_when_phase_completed(phase.id, session)
+                
+                create_system_comment(
+                    task_id,
+                    f"Phase '{phase.name}' status updated to '{phase.status}' via batch report",
+                    session
+                )
+
+        # 4. Handle Task Status Update (legacy/direct)
+        if "task_status" in report:
+            new_status = report["task_status"]
+            task.status = new_status
+            task.last_ping = datetime.now(timezone.utc)
+            session.add(task)
+            create_system_comment(task_id, f"Task status updated to '{task.status}' via batch report", session)
+            
+            # Auto-complete phases if task is done
+            if new_status == "done":
+                for phase in task.phases:
+                    if phase.status != "completed":
+                        phase.status = "completed"
+                        session.add(phase)
+                        update_todos_when_phase_completed(phase.id, session)
+
+    session.commit()
+    recalculate_task_progress(task_id, session)
+    return {"message": "Batch report processed successfully"}
 
 
 @app.patch("/todos/{todo_id}", response_model=TodoRead)

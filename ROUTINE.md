@@ -8,10 +8,11 @@ This file contains MANDATORY instructions for any AI agent interacting with this
 
 **ALL tasks and sub-tasks MUST be tracked using the Status Tracker.**
 
-- Before starting any work, create or update tasks in the Status Tracker
-- Break down complex work into phases and todos
-- Update task status as work progresses
-- Mark tasks as completed when done
+- **New Assignment**: Create a new task in the Status Tracker immediately upon receiving a new assignment or request from the user.
+- Before starting any work, ensure the task exists in the Status Tracker.
+- Break down complex work into phases and todos.
+- Update task status as work progresses.
+- Mark tasks as completed when done.
 
 ---
 
