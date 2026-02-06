@@ -669,3 +669,44 @@ class TestSystemComments:
         # Should have creation comment
         assert len(comments) >= 1
         assert any("created" in c["text"].lower() for c in comments)
+
+class TestStatusSync:
+    def test_task_status_syncs_with_progress(
+        self, client: TestClient, auth_headers: dict
+    ):
+        """Verify that task.status syncs with progress (todo -> in_progress -> done)."""
+        task_data = {
+            "name": "Sync Test Task",
+            "phases": [
+                {
+                    "name": "Phase 1",
+                    "todos": [
+                        {"name": "Todo 1", "status": "todo"},
+                        {"name": "Todo 2", "status": "todo"}
+                    ]
+                }
+            ]
+        }
+        response = client.post("/tasks/", json=task_data, headers=auth_headers)
+        task = response.json()
+        task_id = task["id"]
+        
+        # Initial state (0% progress)
+        assert task["status"] == "todo"
+        assert task["progress_percent"] == 0
+        
+        # Move to 50% progress
+        todo_id = task["phases"][0]["todos"][0]["id"]
+        client.patch(f"/todos/{todo_id}", json={"status": "done"}, headers=auth_headers)
+        
+        response = client.get(f"/tasks/{task_id}")
+        assert response.json()["progress_percent"] == 50
+        assert response.json()["status"] == "in_progress"
+        
+        # Move to 100% progress
+        todo_id2 = task["phases"][0]["todos"][1]["id"]
+        client.patch(f"/todos/{todo_id2}", json={"status": "done"}, headers=auth_headers)
+                
+        response = client.get(f"/tasks/{task_id}")
+        assert response.json()["progress_percent"] == 100
+        assert response.json()["status"] == "done"

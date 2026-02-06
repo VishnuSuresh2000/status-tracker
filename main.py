@@ -389,7 +389,7 @@ def create_task(
         context_tags=task_data.context_tags,
         definition_of_done=task_data.definition_of_done,
         progress_percent=0,
-        status="todo"
+        status="todo",
     )
     session.add(task)
     session.commit()
@@ -518,8 +518,9 @@ def update_todo(
     todo_id: int,
     todo_update: TodoUpdate,
     session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
 ):
-    """Update todo status and trigger progress recalculation."""
+    """Update todo status and propagate to phase and task."""
     todo = session.get(Todo, todo_id)
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")
@@ -530,17 +531,16 @@ def update_todo(
     session.commit()
     session.refresh(todo)
 
-    # Trigger status propagation and progress recalculation
-    update_phase_status_from_todos(todo.phase_id, session)
-
-    # Log the change
+    # Log change
     phase = session.get(Phase, todo.phase_id)
     if phase:
         create_system_comment(
             phase.task_id,
-            f"Todo '{todo.name}' updated: {old_status} -> {todo.status}",
+            f"Todo '{todo.name}' updated from '{old_status}' to '{todo.status}'",
             session,
         )
+        # Propagate status up
+        update_phase_status_from_todos(todo.phase_id, session)
 
     return todo
 
@@ -552,7 +552,7 @@ def update_phase(
     session: Session = Depends(get_session),
     token: str = Depends(verify_token),
 ):
-    """Update phase status and trigger progress recalculation."""
+    """Update phase status and propagate to task."""
     phase = session.get(Phase, phase_id)
     if not phase:
         raise HTTPException(status_code=404, detail="Phase not found")
@@ -560,23 +560,22 @@ def update_phase(
     old_status = phase.status
     phase.status = phase_update.status
     session.add(phase)
-
-    # If marking as completed, mark all todos as done
-    if phase.status == "completed":
-        update_todos_when_phase_completed(phase_id, session)
-
     session.commit()
     session.refresh(phase)
 
-    # Trigger progress recalculation
-    recalculate_task_progress(phase.task_id, session)
+    # If marked completed, mark all todos as done
+    if phase.status == "completed":
+        update_todos_when_phase_completed(phase_id, session)
 
-    # Log the change
+    # Log change
     create_system_comment(
         phase.task_id,
-        f"Phase '{phase.name}' updated: {old_status} -> {phase.status}",
+        f"Phase '{phase.name}' updated from '{old_status}' to '{phase.status}'",
         session,
     )
+
+    # Recalculate task progress
+    recalculate_task_progress(phase.task_id, session)
 
     return phase
 
@@ -586,6 +585,7 @@ def add_comment(
     task_id: int,
     comment_data: CommentCreate,
     session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
 ):
     """Add a manual comment to a task."""
     task = session.get(Task, task_id)
@@ -603,15 +603,6 @@ def add_comment(
     return comment
 
 
-@app.get("/tasks/{task_id}/comments", response_model=List[CommentRead])
-def read_task_comments(task_id: int, session: Session = Depends(get_session)):
-    """Get all comments for a specific task."""
-    task = session.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task.comments
-
-
 # ============================================================================
 # NOTIFICATION ENDPOINTS
 # ============================================================================
@@ -619,28 +610,30 @@ def read_task_comments(task_id: int, session: Session = Depends(get_session)):
 
 @app.get("/notifications/", response_model=List[Notification])
 def read_notifications(unread_only: bool = False):
-    """Get notifications."""
+    """Get all notifications."""
     if unread_only:
         return get_unread_notifications()
     return get_all_notifications()
 
 
-@app.get("/notifications/unread-count")
-def read_unread_count():
-    """Get count of unread notifications."""
-    return {"count": len(get_unread_notifications())}
-
-
-@app.patch("/notifications/{notification_id}/read")
-def mark_read(notification_id: int):
+@app.patch("/notifications/{notification_id}/read", response_model=Notification)
+def mark_as_read(notification_id: int):
     """Mark a notification as read."""
-    if mark_notification_as_read(notification_id):
-        return {"message": "Notification marked as read"}
-    raise HTTPException(status_code=404, detail="Notification not found")
+    notification = mark_notification_as_read(notification_id)
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return notification
 
 
-@app.post("/notifications/read-all")
+@app.post("/notifications/read-all", response_model=dict)
 def mark_all_read():
     """Mark all notifications as read."""
     mark_all_notifications_as_read()
     return {"message": "All notifications marked as read"}
+
+
+@app.get("/notifications/unread-count", response_model=dict)
+def get_unread_count():
+    """Get count of unread notifications."""
+    notifications = get_unread_notifications()
+    return {"count": len(notifications)}
