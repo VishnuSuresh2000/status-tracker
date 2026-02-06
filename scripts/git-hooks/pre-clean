@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Pre-clean hook - runs before git clean
+# 
+# This hook automatically backs up data files before git clean operations.
+#
+
+# Check if protect_data.py exists
+if [ -f "scripts/protect_data.py" ]; then
+    echo "🔒 Protecting data files before git clean..."
+    python scripts/protect_data.py pre-git clean
+    echo ""
+    echo "To restore data after clean, run:"
+    echo "  python scripts/protect_data.py post-git clean"
+fi
+
+exit 0

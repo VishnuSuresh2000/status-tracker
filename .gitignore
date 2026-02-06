@@ -57,6 +57,9 @@ data/*.sqlite
 data/*.sqlite3
 !data/.gitkeep
 
+# Data protection backups
+.data_backups/
+
 # Docker
 *.log
 *.pid

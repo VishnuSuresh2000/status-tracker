@@ -1,0 +1,11 @@
+# Git attributes for data protection
+# Mark database files as precious to prevent accidental deletion
+
+# Database files - treat as binary and precious
+data/*.db binary -diff -merge
+data/*.sqlite binary -diff -merge
+data/*.sqlite3 binary -diff -merge
+
+# Git hooks should be executable
+*.sh eol=lf
+.git/hooks/* eol=lf

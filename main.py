@@ -1,6 +1,7 @@
 # Fixed CI build
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, create_engine, Session, select, Relationship
 from datetime import datetime, timezone
 import redis
@@ -193,7 +194,7 @@ class TaskCreate(TaskBase):
 
 class TaskRead(TaskBase):
     id: int
-    status: str
+    status: Optional[str] = None
     progress_percent: int
     last_ai_summary: Optional[str]
     last_ping: datetime
@@ -361,6 +362,17 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(security))
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+# ============================================================================
+# STATIC FILES
+# ============================================================================
+
+
+@app.get("/")
+async def serve_index():
+    """Serve the index.html file at the root path."""
+    return FileResponse("index.html")
 
 
 # ============================================================================

@@ -248,6 +248,64 @@ This project demonstrates the power of human-AI collaboration in software develo
 
 MIT License
 
+## AI Agent Skill & Routine
+
+This project includes an AI Agent Skill that enables automated agents to interact with the Status Tracker programmatically.
+
+### Agent Skill Location
+
+The skill is located in `agent-skill/` and includes:
+
+- **`SKILL.md`**: Skill definition and usage instructions
+- **`scripts/tracker_api.py`**: Python tool for API interaction
+- **`references/api_docs.md`**: Complete API documentation
+
+### Routine for AI Agents
+
+AI agents working with this project MUST follow the routine defined in `ROUTINE.md`:
+
+1. **On Startup**: Read `ROUTINE.md` and check for existing `in_progress` tasks
+2. **Authorization**: Ask user permission before continuing ongoing work
+3. **Track Everything**: Create tasks for all assignments using phases/todos for complex work
+4. **Report Progress**: Update status and add comments via the API
+
+### Using tracker_api.py
+
+The `tracker_api.py` script provides a simple CLI for interacting with the Status Tracker API:
+
+```bash
+# List all tasks
+python agent-skill/scripts/tracker_api.py list
+
+# Create a new task
+python agent-skill/scripts/tracker_api.py create '{"name": "My Task", "priority": "high"}'
+
+# Update task status
+python agent-skill/scripts/tracker_api.py status <task_id> "in_progress"
+
+# Update a todo item
+python agent-skill/scripts/tracker_api.py todo <todo_id> "done"
+
+# Add a comment
+python agent-skill/scripts/tracker_api.py comment <task_id> "Progress update..."
+```
+
+**Environment Variables**:
+- `STATUS_TRACKER_URL`: API base URL (default: `http://status-tracker-app:8000`)
+- `API_AUTH_TOKEN`: Bearer token for authentication
+
+### API Authentication
+
+All write operations (POST, PATCH, PUT, DELETE) require authentication:
+
+```bash
+curl -H "Authorization: Bearer $API_AUTH_TOKEN" \
+     -H "Content-Type: application/json" \
+     -X POST \
+     -d '{"name": "New Task"}' \
+     http://localhost:8000/tasks/
+```
+
 ## Changelog
 
 ### Phase 1 (Completed)

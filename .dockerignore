@@ -1,0 +1,10 @@
+.venv/
+venv/
+__pycache__/
+.git/
+.pytest_cache/
+data/
+*.db
+*.sqlite
+.env
+# uv.lock is required for build
