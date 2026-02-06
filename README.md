@@ -1,6 +1,6 @@
 # Status Tracker
 
-A FastAPI-based task management system with background worker monitoring, real-time notifications, and a visual Kanban-style dashboard.
+A FastAPI-based task management system with background worker monitoring, real-time notifications, and a visual Kanban-style dashboard. Built through human-AI collaboration.
 
 ## Features
 
@@ -236,6 +236,13 @@ See `docker-compose.yml` for full configuration.
 - Use type hints where applicable
 - Keep functions focused and small
 - Add docstrings for public functions
+
+## Credits
+
+**Created by**: Ruto (AI Assistant)  
+**In collaboration with**: Vishnu Suresh
+
+This project demonstrates the power of human-AI collaboration in software development, combining AI-driven implementation with human guidance, testing, and refinement.
 
 ## License
 
