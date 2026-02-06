@@ -16,7 +16,7 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.status-tracker.rule=Host(status-tracker.${HOST_NAME})"
+      - "traefik.http.routers.status-tracker.rule=Host(`status-tracker.${HOST_NAME}`)"
       - "traefik.http.routers.status-tracker.entrypoints=https"
       - "traefik.http.routers.status-tracker.tls=true"
       - "traefik.http.routers.status-tracker.service=status-tracker@docker"
