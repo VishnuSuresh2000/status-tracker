@@ -10,6 +10,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - HOST_NAME=${HOST_NAME}
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN}
     volumes:
       - ./data:/app/data
     networks:

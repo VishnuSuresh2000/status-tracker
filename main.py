@@ -49,7 +49,7 @@ class Task(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Legacy fields
-    status: Optional[str] = Field(default="todo")
+    status: str = Field(default="todo")
     interval_minutes: Optional[float] = Field(default=60.0)
 
     # Relationships
@@ -194,7 +194,7 @@ class TaskCreate(TaskBase):
 
 class TaskRead(TaskBase):
     id: int
-    status: Optional[str] = None
+    status: str = "todo"
     progress_percent: int
     last_ai_summary: Optional[str]
     last_ping: datetime
@@ -214,6 +214,38 @@ class TaskRead(TaskBase):
 def create_db_and_tables():
     """Create all database tables."""
     SQLModel.metadata.create_all(engine)
+
+
+def migrate_null_statuses():
+    """Migrate existing null status values to correct values based on progress."""
+    from sqlalchemy import text
+
+    with Session(engine) as session:
+        # Find all tasks with null status using raw SQL
+        result = session.exec(
+            text("SELECT id, progress_percent FROM tasks WHERE status IS NULL")
+        )
+        tasks_to_fix = result.all()
+
+        for row in tasks_to_fix:
+            task_id = row[0]
+            progress = row[1]
+
+            # Determine correct status based on progress
+            if progress >= 100:
+                new_status = "done"
+            elif progress > 0:
+                new_status = "in_progress"
+            else:
+                new_status = "todo"
+
+            # Update the task using raw SQL execution
+            update_stmt = text("UPDATE tasks SET status = :status WHERE id = :id")
+            session.execute(update_stmt, {"status": new_status, "id": task_id})
+
+        if tasks_to_fix:
+            session.commit()
+            print(f"Migrated {len(tasks_to_fix)} tasks with null status")
 
 
 # ============================================================================
@@ -332,6 +364,7 @@ def update_todos_when_phase_completed(phase_id: int, session: Session) -> None:
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     create_notification_tables()
+    migrate_null_statuses()
     yield
 
 
