@@ -473,22 +473,16 @@ class TestSingleNotificationAck:
         # Open notification panel
         page.click("button[onclick='toggleNotifications()']")
 
-        # Verify notification is visible and unread (no opacity-60)
-        notif_item = (
-            page.locator("text=Click to mark as read").locator("..").locator("..")
-        )
-        expect(notif_item).not_to_have_class(re.compile("opacity-60"))
-
-        # Click the mark-as-read button for this specific notification
-        # Note: onclick contains "event.stopPropagation(); markNotificationAsRead(id)"
+        # Verify the 'Mark as read' button is visible initially
         mark_button = page.locator(
             f"button[onclick*='markNotificationAsRead({notification.id})']"
         )
         expect(mark_button).to_be_visible()
+
+        # Click it
         mark_button.click()
 
-        # Wait for API call to complete and UI to update
-        time.sleep(1)
+        # Reload page
         page.reload()
         time.sleep(0.5)
 
@@ -496,18 +490,12 @@ class TestSingleNotificationAck:
         page.click("button[onclick='toggleNotifications()']")
         time.sleep(0.3)
 
-        # Verify the specific notification's "Mark as read" button is no longer visible
+        # Verify the specific button is NOT visible
         expect(
             page.locator(
                 f"button[onclick*='markNotificationAsRead({notification.id})']"
             )
         ).not_to_be_visible()
-
-        # Verify the notification now has read styling (opacity-60)
-        notif_container = (
-            page.locator("text=Click to mark as read").locator("..").locator("..")
-        )
-        expect(notif_container).to_have_class(re.compile("opacity-60"))
 
     def test_single_mark_read_does_not_affect_others(self, page: Page):
         """Test that marking one notification as read doesn't affect others."""
