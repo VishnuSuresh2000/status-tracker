@@ -397,6 +397,158 @@ class TestNotificationPanel:
         expect(page.locator("text=Mark all read")).to_be_visible()
 
 
+class TestSingleNotificationAck:
+    """Tests for single notification acknowledgment feature."""
+
+    def test_mark_as_read_button_visible_on_unread(self, page: Page):
+        """Test that mark-as-read button exists on unread notifications."""
+        # Create a task first
+        resp = requests.post(
+            f"{TEST_URL}/tasks/",
+            json={"name": "Single Ack Task", "interval_minutes": 60},
+            headers=AUTH_HEADERS,
+        )
+        task_id = resp.json()["id"]
+
+        # Add a notification using the patched engine
+        notification = add_notification(
+            task_id=task_id,
+            task_name="Single Ack Task",
+            message="Test notification for single ack",
+            notification_type="reminder",
+        )
+
+        page.goto(TEST_URL)
+        time.sleep(1)
+
+        # Open notification panel
+        page.click("button[onclick='toggleNotifications()']")
+
+        # Verify notification is displayed
+        expect(page.locator("text=Test notification for single ack")).to_be_visible()
+
+        # Check that mark-as-read button is visible (typically a checkmark or 'Mark as read' button)
+        # The button should be associated with the notification
+        notification_element = page.locator(
+            f"[data-notification-id='{notification.id}']"
+        )
+        if notification_element.count() > 0:
+            expect(
+                notification_element.locator(
+                    "button[onclick*='markNotificationAsRead']"
+                )
+            ).to_be_visible()
+        else:
+            # Fallback: check for any mark-as-read button in the notification list
+            expect(
+                page.locator("button[onclick*='markNotificationAsRead']").first
+            ).to_be_visible()
+
+    def test_click_mark_as_read_marks_notification(self, page: Page):
+        """Test that clicking the mark-as-read button marks the notification."""
+        # Create a task
+        resp = requests.post(
+            f"{TEST_URL}/tasks/",
+            json={"name": "Click Ack Task", "interval_minutes": 60},
+            headers=AUTH_HEADERS,
+        )
+        task_id = resp.json()["id"]
+
+        # Add a notification
+        notification = add_notification(
+            task_id=task_id,
+            task_name="Click Ack Task",
+            message="Click to mark as read",
+            notification_type="reminder",
+        )
+
+        page.goto(TEST_URL)
+        time.sleep(1)
+
+        # Open notification panel
+        page.click("button[onclick='toggleNotifications()']")
+
+        # Verify notification is visible
+        expect(page.locator("text=Click to mark as read")).to_be_visible()
+
+        # Click the mark-as-read button
+        mark_button = page.locator(
+            f"button[onclick='markNotificationAsRead({notification.id})']"
+        )
+        if mark_button.count() > 0:
+            mark_button.click()
+        else:
+            # Fallback: click the first mark-as-read button
+            page.locator("button[onclick*='markNotificationAsRead']").first.click()
+
+        time.sleep(0.5)  # Wait for API call to complete
+
+        # Verify notification is no longer in unread list
+        # Refresh and check unread count
+        response = requests.get(f"{TEST_URL}/notifications/unread-count")
+        assert response.json()["unread_count"] == 0
+
+    def test_single_mark_read_does_not_affect_others(self, page: Page):
+        """Test that marking one notification as read doesn't affect others."""
+        # Create a task
+        resp = requests.post(
+            f"{TEST_URL}/tasks/",
+            json={"name": "Multi Ack Task", "interval_minutes": 60},
+            headers=AUTH_HEADERS,
+        )
+        task_id = resp.json()["id"]
+
+        # Add multiple notifications
+        notif1 = add_notification(
+            task_id=task_id,
+            task_name="Multi Ack Task",
+            message="First notification",
+            notification_type="reminder",
+        )
+        notif2 = add_notification(
+            task_id=task_id,
+            task_name="Multi Ack Task",
+            message="Second notification",
+            notification_type="reminder",
+        )
+        notif3 = add_notification(
+            task_id=task_id,
+            task_name="Multi Ack Task",
+            message="Third notification",
+            notification_type="completion",
+        )
+
+        page.goto(TEST_URL)
+        time.sleep(1)
+
+        # Verify badge shows 3
+        badge = page.locator("#notificationBadge")
+        expect(badge).to_contain_text("3")
+
+        # Open notification panel
+        page.click("button[onclick='toggleNotifications()']")
+
+        # Mark only the first notification as read via API
+        response = requests.patch(
+            f"{TEST_URL}/notifications/{notif1.id}/read",
+            headers=AUTH_HEADERS,
+        )
+        assert response.status_code == 200
+
+        # Refresh page to see updated state
+        page.goto(TEST_URL)
+        time.sleep(1)
+
+        # Badge should now show 2 (only 2 unread remaining)
+        badge = page.locator("#notificationBadge")
+        expect(badge).to_contain_text("2")
+
+        # Open panel and verify the other two are still there
+        page.click("button[onclick='toggleNotifications()']")
+        expect(page.locator("text=Second notification")).to_be_visible()
+        expect(page.locator("text=Third notification")).to_be_visible()
+
+
 class TestKanbanBoard:
     """Tests for Kanban board functionality."""
 
