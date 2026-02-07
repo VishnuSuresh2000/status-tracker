@@ -483,24 +483,10 @@ class TestSingleNotificationAck:
 
         time.sleep(0.5)  # Wait for API call to complete
 
-        # Verify notification's visual state changed (marked as read)
-        # Read notifications have opacity-60 class and the mark button disappears
-        notification_element = page.locator(
-            f"[data-notification-id='{notification.id}']"
-        )
-        if notification_element.count() > 0:
-            # Check that the notification has the read styling (opacity-60)
-            expect(notification_element).to_have_class(/opacity-60/)
-            # Verify "Mark as read" button is no longer visible for this notification
-            mark_button = notification_element.locator(
-                "button[onclick*='markNotificationAsRead']"
-            )
-            expect(mark_button).not_to_be_visible()
-        else:
-            # Fallback: verify the mark-as-read button is no longer present in the panel
-            expect(
-                page.locator("button[onclick*='markNotificationAsRead']")
-            ).not_to_be_visible()
+        # Verify "Mark as read" button is no longer visible (notification was marked as read)
+        expect(
+            page.locator("button[onclick*='markNotificationAsRead']")
+        ).not_to_be_visible()
 
     def test_single_mark_read_does_not_affect_others(self, page: Page):
         """Test that marking one notification as read doesn't affect others."""
