@@ -9,6 +9,7 @@ from sqlmodel import SQLModel, Session, select
 from sqlalchemy import text, create_engine
 from datetime import datetime, timezone, timedelta
 from notifications import add_notification
+import notifications
 import os
 
 # Port for the test server
@@ -60,6 +61,9 @@ def server():
 @pytest.fixture(autouse=True)
 def cleanup_database():
     """Clean up database before each test."""
+    # Patch notifications engine to use test database
+    notifications.engine = engine
+
     # Clear all data before each test
     with Session(engine) as session:
         # Delete in correct order to respect foreign keys
@@ -303,7 +307,6 @@ class TestNotificationPanel:
 
         expect(page.locator("text=No notifications")).to_be_visible()
 
-    @pytest.mark.skipif(IN_CI, reason="Notification DB engine initialized before test DB setup in CI")
     def test_notification_shows_count_badge(self, page: Page):
         """Test that notification badge shows correct count."""
         # First create a task to ensure task_id exists
@@ -312,17 +315,14 @@ class TestNotificationPanel:
             json={"name": "Notification Test Task", "interval_minutes": 60},
             headers=AUTH_HEADERS,
         )
-        
-        # Create a fresh engine pointing to the test database
-        test_engine = create_engine("sqlite:///./data/test_ui.db")
-        with Session(test_engine) as session:
-            add_notification(
-                task_id=1,
-                task_name="Test Task",
-                message="Test notification message",
-                notification_type="reminder",
-            )
-            session.commit()
+
+        # Add notification using the patched engine
+        add_notification(
+            task_id=1,
+            task_name="Test Task",
+            message="Test notification message",
+            notification_type="reminder",
+        )
 
         page.goto(TEST_URL)
         time.sleep(1)
@@ -332,7 +332,6 @@ class TestNotificationPanel:
         expect(badge).to_be_visible()
         expect(badge).to_contain_text("1")
 
-    @pytest.mark.skipif(IN_CI, reason="Notification DB engine initialized before test DB setup in CI")
     def test_notification_appears_in_panel(self, page: Page):
         """Test that notifications appear in the panel."""
         resp = requests.post(
@@ -341,16 +340,14 @@ class TestNotificationPanel:
             headers=AUTH_HEADERS,
         )
         task_id = resp.json()["id"]
-        
-        test_engine = create_engine("sqlite:///./data/test_ui.db")
-        with Session(test_engine) as session:
-            add_notification(
-                task_id=task_id,
-                task_name="Notification Task",
-                message="This is a test notification",
-                notification_type="reminder",
-            )
-            session.commit()
+
+        # Add notification using the patched engine
+        add_notification(
+            task_id=task_id,
+            task_name="Notification Task",
+            message="This is a test notification",
+            notification_type="reminder",
+        )
 
         page.goto(TEST_URL)
         time.sleep(1)
@@ -358,9 +355,10 @@ class TestNotificationPanel:
         page.click("button[onclick='toggleNotifications()']")
 
         expect(page.locator("#notificationList")).to_contain_text("Notification Task")
-        expect(page.locator("#notificationList")).to_contain_text("This is a test notification")
+        expect(page.locator("#notificationList")).to_contain_text(
+            "This is a test notification"
+        )
 
-    @pytest.mark.skipif(IN_CI, reason="Notification DB engine initialized before test DB setup in CI")
     def test_multiple_notifications_displayed(self, page: Page):
         """Test that multiple notifications are displayed correctly."""
         resp = requests.post(
@@ -369,13 +367,11 @@ class TestNotificationPanel:
             headers=AUTH_HEADERS,
         )
         task_id = resp.json()["id"]
-        
-        test_engine = create_engine("sqlite:///./data/test_ui.db")
-        with Session(test_engine) as session:
-            add_notification(task_id, "Task 1", "Message 1", "reminder")
-            add_notification(task_id, "Task 2", "Message 2", "reminder")
-            add_notification(task_id, "Task 3", "Message 3", "completion")
-            session.commit()
+
+        # Add notifications using the patched engine
+        add_notification(task_id, "Task 1", "Message 1", "reminder")
+        add_notification(task_id, "Task 2", "Message 2", "reminder")
+        add_notification(task_id, "Task 3", "Message 3", "completion")
 
         page.goto(TEST_URL)
         time.sleep(1)
