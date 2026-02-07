@@ -30,6 +30,7 @@ jobs:
       - name: Run tests
         env:
           AUTH_TOKEN: test-token
+          CI: true
         run: uv run pytest --ignore=tests/test_ui.py --junitxml=test-results.xml
       - name: Upload test results
         if: failure()
