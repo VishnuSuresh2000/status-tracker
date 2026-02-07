@@ -9,12 +9,12 @@ from sqlmodel import SQLModel, Session
 import os
 
 # Port for the test server
-TEST_PORT = 8001
+TEST_PORT = 8002
 TEST_URL = f"http://127.0.0.1:{TEST_PORT}"
 
 def run_server():
     # Force test database for UI tests
-    os.environ["DATABASE_URL"] = "sqlite:///./data/test_ui.db"
+    os.environ["DATABASE_URL"] = "sqlite:///./data/test_ui2.db"
     # Re-initialize DB
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
@@ -39,9 +39,9 @@ def server():
         pytest.fail("Server failed to start")
     
     yield
-    # Cleanup data/test_ui.db after tests if needed
-    if os.path.exists("./data/test_ui.db"):
-        os.remove("./data/test_ui.db")
+    # Cleanup data/test_ui2.db after tests if needed
+    if os.path.exists("./data/test_ui2.db"):
+        os.remove("./data/test_ui2.db")
 
 def test_kanban_board_functionality(page: Page):
     page.goto(TEST_URL)
