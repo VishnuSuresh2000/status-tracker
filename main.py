@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, create_engine, Session, select, Relationship
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import redis
 import os
 from typing import List, Optional
@@ -56,6 +56,12 @@ class Task(SQLModel, table=True):
     status: str = Field(default="todo")
     interval_minutes: Optional[float] = Field(default=60.0)
 
+    # New ping system fields
+    assigned_agent_id: Optional[int] = Field(default=None, foreign_key="agents.id")
+    ping_interval_minutes: int = Field(default=30)
+    is_ping_enabled: bool = Field(default=True)
+    last_agent_acknowledgment: Optional[datetime] = Field(default=None)
+
     # Relationships
     phases: List["Phase"] = Relationship(
         back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
@@ -63,6 +69,8 @@ class Task(SQLModel, table=True):
     comments: List["Comment"] = Relationship(
         back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    assigned_agent: Optional["Agent"] = Relationship(back_populates="current_task")
+    assignments: List["TaskAssignment"] = Relationship(back_populates="task")
 
 
 class Phase(SQLModel, table=True):
@@ -79,7 +87,7 @@ class Phase(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    task: Task = Relationship(back_populates="phases")
+    task: "Task" = Relationship(back_populates="phases")
     todos: List["Todo"] = Relationship(back_populates="phase")
 
 
@@ -94,7 +102,7 @@ class Todo(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    phase: Phase = Relationship(back_populates="todos")
+    phase: "Phase" = Relationship(back_populates="todos")
 
 
 class Comment(SQLModel, table=True):
@@ -107,7 +115,51 @@ class Comment(SQLModel, table=True):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    task: Task = Relationship(back_populates="comments")
+    task: "Task" = Relationship(back_populates="comments")
+
+
+class Agent(SQLModel, table=True):
+    __tablename__ = "agents"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    type: str = Field(default="sub_agent")  # main_agent, sub_agent
+    status: str = Field(default="idle")  # idle, busy, working, offline
+    last_acknowledgment: Optional[datetime] = Field(default=None)
+    current_task_id: Optional[int] = Field(default=None, foreign_key="tasks.id")
+    capabilities: Optional[str] = Field(default=None)  # JSON or comma-separated
+    endpoint_url: Optional[str] = Field(default=None)
+    timeout_minutes: int = Field(default=30)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    current_task: Optional["Task"] = Relationship(back_populates="assigned_agent")
+    task_assignments: List["TaskAssignment"] = Relationship(back_populates="agent")
+
+
+class TaskAssignment(SQLModel, table=True):
+    __tablename__ = "task_assignments"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: int = Field(foreign_key="tasks.id", index=True)
+    agent_id: int = Field(foreign_key="agents.id", index=True)
+    assigned_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    acknowledged_at: Optional[datetime] = Field(default=None)
+    status: str = Field(
+        default="pending"
+    )  # pending, acknowledged, snoozed, completed, failed
+    original_agent_id: Optional[int] = Field(default=None, foreign_key="agents.id")
+    escalation_count: int = Field(default=0)
+    snooze_until: Optional[datetime] = Field(default=None)
+    last_ping_sent: Optional[datetime] = Field(default=None)
+
+    # Relationships
+    task: "Task" = Relationship(back_populates="assignments")
+    agent: "Agent" = Relationship(back_populates="task_assignments")
+    original_agent: Optional["Agent"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "TaskAssignment.original_agent_id"}
+    )
 
 
 # ============================================================================
@@ -209,6 +261,53 @@ class TaskRead(TaskBase):
     phases: List[PhaseRead] = []
     comments: List[CommentRead] = []
     unread_reminder_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Agent Schemas
+class AgentBase(SQLModel):
+    name: str
+    type: str = "sub_agent"
+    capabilities: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    timeout_minutes: int = 30
+    is_active: bool = True
+
+
+class AgentCreate(AgentBase):
+    pass
+
+
+class AgentRead(AgentBase):
+    id: int
+    status: str
+    last_acknowledgment: Optional[datetime]
+    current_task_id: Optional[int]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# TaskAssignment Schemas
+class TaskAssignmentBase(SQLModel):
+    task_id: int
+    agent_id: int
+
+
+class TaskAssignmentCreate(TaskAssignmentBase):
+    pass
+
+
+class TaskAssignmentRead(TaskAssignmentBase):
+    id: int
+    assigned_at: datetime
+    acknowledged_at: Optional[datetime]
+    status: str
+    original_agent_id: Optional[int]
+    escalation_count: int
+    snooze_until: Optional[datetime]
+    last_ping_sent: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -822,3 +921,149 @@ def get_unread_count(session: Session = Depends(get_session)):
     """Get count of unread notifications."""
     notifications = get_unread_notifications(session)
     return {"unread_count": len(notifications)}
+
+
+# ============================================================================
+# AGENT ENDPOINTS
+# ============================================================================
+
+
+@app.post("/agents/", response_model=AgentRead)
+def create_agent(
+    agent_data: AgentCreate,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
+):
+    """Create a new agent."""
+    agent = Agent(
+        name=agent_data.name,
+        type=agent_data.type,
+        capabilities=agent_data.capabilities,
+        endpoint_url=agent_data.endpoint_url,
+        timeout_minutes=agent_data.timeout_minutes,
+        is_active=agent_data.is_active,
+    )
+    session.add(agent)
+    session.commit()
+    session.refresh(agent)
+    return agent
+
+
+@app.get("/agents/", response_model=List[AgentRead])
+def read_agents(session: Session = Depends(get_session)):
+    """Get all agents."""
+    agents = session.exec(select(Agent)).all()
+    return agents
+
+
+@app.get("/agents/{agent_id}", response_model=AgentRead)
+def read_agent(agent_id: int, session: Session = Depends(get_session)):
+    """Get a specific agent."""
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+@app.post("/agents/{agent_id}/acknowledge", response_model=dict)
+def acknowledge_agent(
+    agent_id: int,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
+):
+    """Agent acknowledges ping (updates last_acknowledgment, status)."""
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent.last_acknowledgment = datetime.now(timezone.utc)
+    agent.status = "idle"  # Reset to idle when acknowledging
+    session.add(agent)
+    session.commit()
+
+    return {
+        "message": "Agent acknowledged successfully",
+        "agent_id": agent_id,
+        "last_acknowledgment": agent.last_acknowledgment,
+    }
+
+
+@app.post("/agents/{agent_id}/snooze", response_model=dict)
+def snooze_agent(
+    agent_id: int,
+    snooze_minutes: int,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
+):
+    """Snooze agent (set snooze_until)."""
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    snooze_until = datetime.now(timezone.utc).replace(
+        second=0, microsecond=0
+    ) + timedelta(minutes=snooze_minutes)
+    agent.status = "snoozed"
+    session.add(agent)
+    session.commit()
+
+    return {
+        "message": "Agent snoozed successfully",
+        "agent_id": agent_id,
+        "snooze_until": snooze_until,
+    }
+
+
+# ============================================================================
+# TASK ASSIGNMENT ENDPOINTS
+# ============================================================================
+
+
+@app.post("/tasks/{task_id}/assign", response_model=TaskAssignmentRead)
+def assign_task(
+    task_id: int,
+    assignment_data: TaskAssignmentCreate,
+    session: Session = Depends(get_session),
+    token: str = Depends(verify_token),
+):
+    """Assign task to agent (creates TaskAssignment, updates task.assigned_agent_id)."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    agent = session.get(Agent, assignment_data.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Create task assignment
+    assignment = TaskAssignment(
+        task_id=task_id,
+        agent_id=assignment_data.agent_id,
+        status="pending",
+    )
+    session.add(assignment)
+
+    # Update task's assigned agent
+    task.assigned_agent_id = assignment_data.agent_id
+    session.add(task)
+
+    session.commit()
+    session.refresh(assignment)
+
+    return assignment
+
+
+@app.get("/tasks/{task_id}/assignments", response_model=List[TaskAssignmentRead])
+def read_task_assignments(
+    task_id: int,
+    session: Session = Depends(get_session),
+):
+    """Get assignment history for task."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    assignments = session.exec(
+        select(TaskAssignment).where(TaskAssignment.task_id == task_id)
+    ).all()
+    return assignments
