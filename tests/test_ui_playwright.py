@@ -3,6 +3,7 @@ import uvicorn
 import threading
 import time
 import requests
+import re
 from playwright.sync_api import Page, expect, BrowserContext
 from main import app, engine, create_db_and_tables, Task, Phase
 from sqlmodel import SQLModel, Session, select
@@ -468,18 +469,16 @@ class TestSingleNotificationAck:
         # Open notification panel
         page.click("button[onclick='toggleNotifications()']")
 
-        # Verify notification is visible
-        expect(page.locator("text=Click to mark as read")).to_be_visible()
+        # Verify notification is visible and unread (no opacity-60)
+        notif_item = page.locator("text=Click to mark as read").locator("..").locator("..")
+        expect(notif_item).not_to_have_class(re.compile("opacity-60"))
 
-        # Click the mark-as-read button
+        # Click the mark-as-read button for this specific notification
         mark_button = page.locator(
             f"button[onclick='markNotificationAsRead({notification.id})']"
         )
-        if mark_button.count() > 0:
-            mark_button.click()
-        else:
-            # Fallback: click the first mark-as-read button
-            page.locator("button[onclick*='markNotificationAsRead']").first.click()
+        expect(mark_button).to_be_visible()
+        mark_button.click()
 
         # Wait for API call to complete and UI to update
         time.sleep(1)
@@ -490,10 +489,14 @@ class TestSingleNotificationAck:
         page.click("button[onclick='toggleNotifications()']")
         time.sleep(0.3)
 
-        # Verify "Mark as read" button is no longer visible (notification was marked as read)
+        # Verify the specific notification's "Mark as read" button is no longer visible
         expect(
-            page.locator("button[onclick*='markNotificationAsRead']")
+            page.locator(f"button[onclick='markNotificationAsRead({notification.id})']")
         ).not_to_be_visible()
+
+        # Verify the notification now has read styling (opacity-60)
+        notif_container = page.locator("text=Click to mark as read").locator("..").locator("..")
+        expect(notif_container).to_have_class(re.compile("opacity-60"))
 
     def test_single_mark_read_does_not_affect_others(self, page: Page):
         """Test that marking one notification as read doesn't affect others."""
