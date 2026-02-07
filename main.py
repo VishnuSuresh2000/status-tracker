@@ -24,7 +24,7 @@ from notifications import (
 )
 
 # Database setup
-DATABASE_URL = "sqlite:///./data/tasks.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/tasks.db")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 # ============================================================================
@@ -798,9 +798,8 @@ def read_notifications(
 def mark_as_read(
     notification_id: int,
     session: Session = Depends(get_session),
-    token: str = Depends(verify_token),
 ):
-    """Mark a notification as read."""
+    """Mark a notification as read. No auth required - UI-only operation."""
     if not mark_notif_as_read(notification_id, session):
         raise HTTPException(status_code=404, detail="Notification not found")
     return {
@@ -811,9 +810,9 @@ def mark_as_read(
 
 @app.post("/notifications/read-all", response_model=dict)
 def mark_all_read(
-    session: Session = Depends(get_session), token: str = Depends(verify_token)
+    session: Session = Depends(get_session),
 ):
-    """Mark all notifications as read."""
+    """Mark all notifications as read. No auth required - UI-only operation."""
     count = mark_all_notifs_as_read(session)
     return {"message": f"{count} notifications marked as read"}
 
