@@ -481,7 +481,14 @@ class TestSingleNotificationAck:
             # Fallback: click the first mark-as-read button
             page.locator("button[onclick*='markNotificationAsRead']").first.click()
 
-        time.sleep(0.5)  # Wait for API call to complete
+        # Wait for API call to complete and UI to update
+        time.sleep(1)
+        page.reload()
+        time.sleep(0.5)
+
+        # Re-open notification panel
+        page.click("button[onclick='toggleNotifications()']")
+        time.sleep(0.3)
 
         # Verify "Mark as read" button is no longer visible (notification was marked as read)
         expect(
