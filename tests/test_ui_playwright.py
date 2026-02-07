@@ -474,8 +474,9 @@ class TestSingleNotificationAck:
         expect(notif_item).not_to_have_class(re.compile("opacity-60"))
 
         # Click the mark-as-read button for this specific notification
+        # Note: onclick contains "event.stopPropagation(); markNotificationAsRead(id)"
         mark_button = page.locator(
-            f"button[onclick='markNotificationAsRead({notification.id})']"
+            f"button[onclick*='markNotificationAsRead({notification.id})']"
         )
         expect(mark_button).to_be_visible()
         mark_button.click()
@@ -491,7 +492,7 @@ class TestSingleNotificationAck:
 
         # Verify the specific notification's "Mark as read" button is no longer visible
         expect(
-            page.locator(f"button[onclick='markNotificationAsRead({notification.id})']")
+            page.locator(f"button[onclick*='markNotificationAsRead({notification.id})']")
         ).not_to_be_visible()
 
         # Verify the notification now has read styling (opacity-60)
