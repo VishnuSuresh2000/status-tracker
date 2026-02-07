@@ -2,18 +2,14 @@ import pytest
 import uvicorn
 import threading
 import time
- import requests
+import requests
 from playwright.sync_api import Page, expect, BrowserContext
 from main import app, engine, create_db_and_tables, Task, Phase
 from sqlmodel import SQLModel, Session, select
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 from datetime import datetime, timezone, timedelta
 from notifications import add_notification
 import os
-
-# Skip notification tests that require direct database writes in CI
-# because the engine is created before the test database is set up
-IN_CI = os.environ.get("CI") == "true"
 
 # Port for the test server
 TEST_PORT = 8001
@@ -303,7 +299,6 @@ class TestNotificationPanel:
 
         expect(page.locator("text=No notifications")).to_be_visible()
 
-    @pytest.mark.skipif(IN_CI, reason="Direct database writes don't work in CI due to engine initialization order")
     def test_notification_shows_count_badge(self, page: Page):
         """Test that notification badge shows correct count."""
         # First create a task to ensure task_id exists
@@ -313,8 +308,9 @@ class TestNotificationPanel:
             headers=AUTH_HEADERS,
         )
         
-        # Add notification using the same database as the test server
-        with Session(engine) as session:
+        # Create a fresh engine pointing to the test database
+        test_engine = create_engine("sqlite:///./data/test_ui.db")
+        with Session(test_engine) as session:
             add_notification(
                 task_id=1,
                 task_name="Test Task",
@@ -331,18 +327,19 @@ class TestNotificationPanel:
         expect(badge).to_be_visible()
         expect(badge).to_contain_text("1")
 
-    @pytest.mark.skipif(IN_CI, reason="Direct database writes don't work in CI due to engine initialization order")
     def test_notification_appears_in_panel(self, page: Page):
         """Test that notifications appear in the panel."""
-        requests.post(
+        resp = requests.post(
             f"{TEST_URL}/tasks/",
             json={"name": "Notification Task Parent", "interval_minutes": 60},
             headers=AUTH_HEADERS,
         )
+        task_id = resp.json()["id"]
         
-        with Session(engine) as session:
+        test_engine = create_engine("sqlite:///./data/test_ui.db")
+        with Session(test_engine) as session:
             add_notification(
-                task_id=1,
+                task_id=task_id,
                 task_name="Notification Task",
                 message="This is a test notification",
                 notification_type="reminder",
@@ -357,19 +354,20 @@ class TestNotificationPanel:
         expect(page.locator("#notificationList")).to_contain_text("Notification Task")
         expect(page.locator("#notificationList")).to_contain_text("This is a test notification")
 
-    @pytest.mark.skipif(IN_CI, reason="Direct database writes don't work in CI due to engine initialization order")
     def test_multiple_notifications_displayed(self, page: Page):
         """Test that multiple notifications are displayed correctly."""
-        requests.post(
+        resp = requests.post(
             f"{TEST_URL}/tasks/",
             json={"name": "Multi Notification Task", "interval_minutes": 60},
             headers=AUTH_HEADERS,
         )
+        task_id = resp.json()["id"]
         
-        with Session(engine) as session:
-            add_notification(1, "Task 1", "Message 1", "reminder")
-            add_notification(2, "Task 2", "Message 2", "reminder")
-            add_notification(3, "Task 3", "Message 3", "completion")
+        test_engine = create_engine("sqlite:///./data/test_ui.db")
+        with Session(test_engine) as session:
+            add_notification(task_id, "Task 1", "Message 1", "reminder")
+            add_notification(task_id, "Task 2", "Message 2", "reminder")
+            add_notification(task_id, "Task 3", "Message 3", "completion")
             session.commit()
 
         page.goto(TEST_URL)
