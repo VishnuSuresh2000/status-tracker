@@ -533,13 +533,16 @@
                 list.innerHTML = '<p class="p-4 text-gray-500 text-sm">No notifications</p>';
             } else {
                 list.innerHTML = notifications.map(n => `
-                    <div class="p-3 border-b hover:bg-gray-50">
+                    <div class="p-3 border-b hover:bg-gray-50 ${n.is_read ? 'opacity-60 bg-gray-50' : ''}">
                         <div class="flex justify-between items-start">
-                            <p class="text-sm font-medium text-gray-800">${n.task_name}</p>
+                            <p class="text-sm font-medium text-gray-800 ${n.is_read ? 'text-gray-500' : ''}">${n.task_name}</p>
                             <span class="text-xs text-gray-400">${new Date(n.created_at).toLocaleTimeString()}</span>
                         </div>
-                        <p class="text-xs text-gray-600 mt-1">${n.message}</p>
-                        <span class="inline-block mt-2 text-[10px] px-2 py-1 rounded ${n.notification_type === 'reminder' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${n.notification_type}</span>
+                        <p class="text-xs text-gray-600 mt-1 ${n.is_read ? 'text-gray-400' : ''}">${n.message}</p>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-[10px] px-2 py-1 rounded ${n.notification_type === 'reminder' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${n.notification_type}</span>
+                            ${!n.is_read ? `<button onclick="event.stopPropagation(); markNotificationAsRead(${n.id})" class="text-xs text-blue-600 hover:text-blue-800 hover:underline">Mark as read</button>` : ''}
+                        </div>
                     </div>
                 `).join('');
             }
@@ -559,6 +562,16 @@
         async function markAllAsRead() {
             await fetch('/notifications/read-all', { method: 'POST' });
             fetchNotifications();
+        }
+
+        async function markNotificationAsRead(notificationId) {
+            try {
+                await fetch(`/notifications/${notificationId}/read`, { method: 'PATCH' });
+                fetchNotifications();
+                fetchTasks();
+            } catch (e) {
+                console.error('Failed to mark notification as read:', e);
+            }
         }
 
         // Close notification panel when clicking outside
