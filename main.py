@@ -8,7 +8,7 @@ import redis
 import os
 from typing import List, Optional
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -47,7 +47,7 @@ class Task(SQLModel, table=True):
     last_ai_summary: Optional[str] = Field(default=None)
     last_ping: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
     # New fields for Rich Info
     agent_name: str = Field(default="Main Agent")
     skills: Optional[str] = Field(default=None)
@@ -71,7 +71,7 @@ class Phase(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_id: int = Field(foreign_key="tasks.id", index=True)
     name: str = Field(index=True)
-    description: Optional[str] = Field(default=None) # New field
+    description: Optional[str] = Field(default=None)  # New field
     status: str = Field(
         default="not_started"
     )  # not_started, in_progress, completed, blocked
@@ -89,7 +89,7 @@ class Todo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     phase_id: int = Field(foreign_key="phases.id", index=True)
     name: str = Field(index=True)
-    description: Optional[str] = Field(default=None) # New field
+    description: Optional[str] = Field(default=None)  # New field
     status: str = Field(default="todo")  # todo, in_progress, done
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -135,8 +135,7 @@ class TodoRead(TodoBase):
     phase_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Phase Schemas
@@ -161,8 +160,7 @@ class PhaseRead(PhaseBase):
     created_at: datetime
     todos: List[TodoRead] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Comment Schemas
@@ -180,8 +178,7 @@ class CommentRead(CommentBase):
     task_id: int
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Task Schemas
@@ -213,8 +210,7 @@ class TaskRead(TaskBase):
     comments: List[CommentRead] = []
     unread_reminder_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -501,11 +497,24 @@ def read_tasks(session: Session = Depends(get_session)):
     for task in tasks:
         # Create TaskRead object manually to include calculated field
         task_data = task.model_dump()
-        task_data["phases"] = [p.model_dump(include={"id", "task_id", "name", "status", "order", "created_at", "todos"}) for p in task.phases]
+        task_data["phases"] = [
+            p.model_dump(
+                include={
+                    "id",
+                    "task_id",
+                    "name",
+                    "status",
+                    "order",
+                    "created_at",
+                    "todos",
+                }
+            )
+            for p in task.phases
+        ]
         # Ensure todos are also dumped
         for p_idx, phase in enumerate(task.phases):
             task_data["phases"][p_idx]["todos"] = [t.model_dump() for t in phase.todos]
-        
+
         task_data["comments"] = [c.model_dump() for c in task.comments]
         task_data["unread_reminder_count"] = get_unread_reminder_count(task.id, session)
         results.append(TaskRead(**task_data))
@@ -518,15 +527,15 @@ def read_task(task_id: int, session: Session = Depends(get_session)):
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     task_data = task.model_dump()
     task_data["phases"] = [p.model_dump() for p in task.phases]
     for p_idx, phase in enumerate(task.phases):
         task_data["phases"][p_idx]["todos"] = [t.model_dump() for t in phase.todos]
-    
+
     task_data["comments"] = [c.model_dump() for c in task.comments]
     task_data["unread_reminder_count"] = get_unread_reminder_count(task.id, session)
-    
+
     return TaskRead(**task_data)
 
 
@@ -614,7 +623,7 @@ def batch_report(
                 author=report.get("author", "sub-agent"),
             )
             session.add(comment)
-        
+
         # 2. Handle Todo Status Updates
         if "todo_id" in report and "status" in report:
             todo = session.get(Todo, report["todo_id"])
@@ -622,14 +631,14 @@ def batch_report(
                 old_status = todo.status
                 todo.status = report["status"]
                 session.add(todo)
-                
+
                 # Propagate to phase
                 update_phase_status_from_todos(todo.phase_id, session)
-                
+
                 create_system_comment(
                     task_id,
                     f"Todo '{todo.name}' status updated to '{todo.status}' via batch report",
-                    session
+                    session,
                 )
 
         # 3. Handle Phase Status Updates
@@ -639,14 +648,14 @@ def batch_report(
                 old_status = phase.status
                 phase.status = report["status"]
                 session.add(phase)
-                
+
                 if phase.status == "completed":
                     update_todos_when_phase_completed(phase.id, session)
-                
+
                 create_system_comment(
                     task_id,
                     f"Phase '{phase.name}' status updated to '{phase.status}' via batch report",
-                    session
+                    session,
                 )
 
         # 4. Handle Task Status Update (legacy/direct)
@@ -655,8 +664,12 @@ def batch_report(
             task.status = new_status
             task.last_ping = datetime.now(timezone.utc)
             session.add(task)
-            create_system_comment(task_id, f"Task status updated to '{task.status}' via batch report", session)
-            
+            create_system_comment(
+                task_id,
+                f"Task status updated to '{task.status}' via batch report",
+                session,
+            )
+
             # Auto-complete phases if task is done
             if new_status == "done":
                 for phase in task.phases:
