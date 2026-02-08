@@ -91,7 +91,10 @@ class Phase(SQLModel, table=True):
 
     # Relationships
     task: "Task" = Relationship(back_populates="phases")
-    todos: List["Todo"] = Relationship(back_populates="phase")
+    todos: List["Todo"] = Relationship(
+        back_populates="phase", 
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class Todo(SQLModel, table=True):
@@ -258,7 +261,7 @@ class TaskBase(BaseModel):
 
 
 class TaskCreate(TaskBase):
-    phases: Optional[List[PhaseCreate]] = []
+    phases: List[PhaseCreate]  # Required - must have at least one phase
 
 
 class TaskRead(TaskBase):
@@ -555,7 +558,19 @@ def create_task(
     session: Session = Depends(get_session),
     token: str = Depends(verify_token),
 ):
-    """Create a task with optional nested phases and todos."""
+    """Create a task with required nested phases and todos."""
+    # Validate that at least one phase is provided
+    if not task_data.phases or len(task_data.phases) == 0:
+        raise HTTPException(status_code=400, detail="At least one phase is required for task creation")
+    
+    # Validate that each phase has at least one todo
+    for i, phase_data in enumerate(task_data.phases):
+        if not phase_data.todos or len(phase_data.todos) == 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Phase '{phase_data.name}' (index {i}) must have at least one todo"
+            )
+    
     task = Task(
         name=task_data.name,
         description=task_data.description,
@@ -574,7 +589,7 @@ def create_task(
     session.commit()
     session.refresh(task)
 
-    for phase_data in task_data.phases or []:
+    for phase_data in task_data.phases:
         phase = Phase(
             task_id=task.id,
             name=phase_data.name,
@@ -586,7 +601,7 @@ def create_task(
         session.commit()
         session.refresh(phase)
 
-        for todo_data in phase_data.todos or []:
+        for todo_data in phase_data.todos:
             todo = Todo(
                 phase_id=phase.id,
                 name=todo_data.name,

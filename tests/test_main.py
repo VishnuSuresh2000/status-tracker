@@ -1,8 +1,27 @@
 import os
+
+# Set test auth token BEFORE importing main
+os.environ["API_AUTH_TOKEN"] = "test-auth-token-for-tests"
+
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, StaticPool
 from main import app, get_session, Task
 import pytest
+
+# Minimal task payload with required phase
+MINIMAL_TASK = {
+    "name": "Test Task",
+    "phases": [
+        {
+            "name": "Default Phase",
+            "status": "todo",
+            "order": 1,
+            "todos": [
+                {"name": "Default Todo", "status": "todo"}
+            ]
+        }
+    ]
+}
 
 # Setup in-memory SQLite for testing
 engine = create_engine(
@@ -53,6 +72,14 @@ def test_create_task(client: TestClient, auth_headers: dict):
             "name": "Test Task",
             "priority": "high",
             "description": "Test description",
+            "phases": [
+                {
+                    "name": "Phase 1",
+                    "status": "todo",
+                    "order": 1,
+                    "todos": [{"name": "Todo 1", "status": "todo"}]
+                }
+            ]
         },
         headers=auth_headers,
     )
@@ -69,8 +96,8 @@ def test_create_task(client: TestClient, auth_headers: dict):
 
 
 def test_read_tasks(client: TestClient, auth_headers: dict):
-    client.post("/tasks/", json={"name": "Task 1"}, headers=auth_headers)
-    client.post("/tasks/", json={"name": "Task 2"}, headers=auth_headers)
+    client.post("/tasks/", json={"name": "Task 1", "phases": [{"name": "Phase 1", "status": "todo", "order": 1, "todos": [{"name": "Todo 1", "status": "todo"}]}]}, headers=auth_headers)
+    client.post("/tasks/", json={"name": "Task 2", "phases": [{"name": "Phase 1", "status": "todo", "order": 1, "todos": [{"name": "Todo 1", "status": "todo"}]}]}, headers=auth_headers)
 
     response = client.get("/tasks/")
     data = response.json()
@@ -84,7 +111,12 @@ def test_read_tasks(client: TestClient, auth_headers: dict):
 def test_update_task_legacy_status(client: TestClient, auth_headers: dict):
     """Test legacy PATCH /tasks/{id} endpoint updates task status field."""
     response = client.post(
-        "/tasks/", json={"name": "Transition Task"}, headers=auth_headers
+        "/tasks/", 
+        json={
+            "name": "Transition Task",
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        }, 
+        headers=auth_headers
     )
     task_id = response.json()["id"]
 
@@ -100,7 +132,12 @@ def test_update_task_legacy_status(client: TestClient, auth_headers: dict):
 
 def test_delete_task(client: TestClient, auth_headers: dict):
     response = client.post(
-        "/tasks/", json={"name": "Task to Delete"}, headers=auth_headers
+        "/tasks/", 
+        json={
+            "name": "Task to Delete",
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        }, 
+        headers=auth_headers
     )
     task_id = response.json()["id"]
 
@@ -127,7 +164,11 @@ def test_edit_task_name_only(client: TestClient, auth_headers: dict):
     """Test editing task name with legacy PUT endpoint."""
     response = client.post(
         "/tasks/",
-        json={"name": "Original Name", "priority": "medium"},
+        json={
+            "name": "Original Name", 
+            "priority": "medium",
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        },
         headers=auth_headers,
     )
     task_id = response.json()["id"]
@@ -143,7 +184,11 @@ def test_edit_task_name_only(client: TestClient, auth_headers: dict):
 def test_edit_task_interval_only(client: TestClient, auth_headers: dict):
     response = client.post(
         "/tasks/",
-        json={"name": "Task Name", "interval_minutes": 10.0},
+        json={
+            "name": "Task Name", 
+            "interval_minutes": 10.0,
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        },
         headers=auth_headers,
     )
     task_id = response.json()["id"]
@@ -159,7 +204,11 @@ def test_edit_task_interval_only(client: TestClient, auth_headers: dict):
 def test_edit_task_both_fields(client: TestClient, auth_headers: dict):
     response = client.post(
         "/tasks/",
-        json={"name": "Original Name", "interval_minutes": 10.0},
+        json={
+            "name": "Original Name", 
+            "interval_minutes": 10.0,
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        },
         headers=auth_headers,
     )
     task_id = response.json()["id"]
@@ -180,7 +229,7 @@ def test_edit_task_not_found(client: TestClient, auth_headers: dict):
 
 def test_read_notifications(client: TestClient, session: Session, auth_headers: dict):
     # Create a task first
-    response = client.post("/tasks/", json={"name": "Test Task"}, headers=auth_headers)
+    response = client.post("/tasks/", json=MINIMAL_TASK, headers=auth_headers)
     task_id = response.json()["id"]
 
     # Add a notification using the test session
@@ -210,7 +259,7 @@ def test_read_notifications_unread_only(
     client: TestClient, session: Session, auth_headers: dict
 ):
     # Create a task
-    response = client.post("/tasks/", json={"name": "Test Task"}, headers=auth_headers)
+    response = client.post("/tasks/", json=MINIMAL_TASK, headers=auth_headers)
     task_id = response.json()["id"]
 
     # Add two notifications using the test session
@@ -253,7 +302,7 @@ def test_mark_notification_as_read(
     client: TestClient, session: Session, auth_headers: dict
 ):
     # Create a task and notification
-    response = client.post("/tasks/", json={"name": "Test Task"}, headers=auth_headers)
+    response = client.post("/tasks/", json=MINIMAL_TASK, headers=auth_headers)
     task_id = response.json()["id"]
 
     from notifications import Notification
@@ -287,7 +336,7 @@ def test_mark_all_notifications_as_read(
     client: TestClient, session: Session, auth_headers: dict
 ):
     # Create a task and multiple notifications
-    response = client.post("/tasks/", json={"name": "Test Task"}, headers=auth_headers)
+    response = client.post("/tasks/", json=MINIMAL_TASK, headers=auth_headers)
     task_id = response.json()["id"]
 
     from notifications import Notification
@@ -312,7 +361,7 @@ def test_mark_all_notifications_as_read(
 
 def test_get_unread_count(client: TestClient, session: Session, auth_headers: dict):
     # Create a task and notifications
-    response = client.post("/tasks/", json={"name": "Test Task"}, headers=auth_headers)
+    response = client.post("/tasks/", json=MINIMAL_TASK, headers=auth_headers)
     task_id = response.json()["id"]
 
     from notifications import Notification

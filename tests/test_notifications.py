@@ -238,7 +238,12 @@ class TestNotificationAPIEndpoints:
         """Verify PATCH /notifications/{id}/read works correctly."""
         # Create a task first
         response = client.post(
-            "/tasks/", json={"name": "API Test Task"}, headers=auth_headers
+            "/tasks/", 
+            json={
+                "name": "API Test Task",
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            }, 
+            headers=auth_headers
         )
         assert response.status_code == 200
         task_id = response.json()["id"]
@@ -281,7 +286,12 @@ class TestNotificationAPIEndpoints:
         """Verify that marking as read actually updates the is_read field in database."""
         # Create a task
         response = client.post(
-            "/tasks/", json={"name": "DB Test Task"}, headers=auth_headers
+            "/tasks/", 
+            json={
+                "name": "DB Test Task",
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            }, 
+            headers=auth_headers
         )
         assert response.status_code == 200
         task_id = response.json()["id"]

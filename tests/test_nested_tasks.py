@@ -1,6 +1,10 @@
 """Tests for nested task structure (Tasks -> Phases -> Todos + Comments)."""
 
 import os
+
+# Set test auth token BEFORE importing main
+os.environ["API_AUTH_TOKEN"] = "test-auth-token-for-tests"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, StaticPool, select
@@ -55,8 +59,7 @@ def client_fixture(session: Session):
 @pytest.fixture(name="auth_headers")
 def auth_headers_fixture():
     """Return valid authentication headers."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 @pytest.fixture(name="sample_task_with_phases")
@@ -107,13 +110,23 @@ class TestCreateTaskWithNestedStructure:
     """T-001: Create task with nested phases."""
 
     def test_create_task_with_phases(self, client: TestClient, auth_headers: dict):
-        """Test creating a task with phases but no todos."""
+        """Test creating a task with phases and todos."""
         task_data = {
             "name": "Simple Project",
             "priority": "medium",
             "phases": [
-                {"name": "Phase 1", "status": "not_started", "order": 1},
-                {"name": "Phase 2", "status": "not_started", "order": 2},
+                {
+                    "name": "Phase 1", 
+                    "status": "not_started", 
+                    "order": 1,
+                    "todos": [{"name": "Todo 1"}]
+                },
+                {
+                    "name": "Phase 2", 
+                    "status": "not_started", 
+                    "order": 2,
+                    "todos": [{"name": "Todo 2"}]
+                },
             ],
         }
 
@@ -156,16 +169,12 @@ class TestCreateTaskWithNestedStructure:
         assert data["progress_percent"] > 0
 
     def test_create_task_without_phases(self, client: TestClient, auth_headers: dict):
-        """E-001: Create task with empty phases list."""
+        """E-001: Create task with empty phases list fails."""
         task_data = {"name": "Empty Task", "priority": "low", "phases": []}
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
-        data = response.json()
-
-        assert response.status_code == 200
-        assert data["name"] == "Empty Task"
-        assert len(data["phases"]) == 0
-        assert data["progress_percent"] == 0
+        assert response.status_code == 400
+        assert "at least one phase" in response.json()["detail"].lower()
 
 
 # ============================================================================
@@ -472,7 +481,7 @@ class TestEdgeCases:
     """E-001 to E-006: Edge case tests."""
 
     def test_create_phase_without_todos(self, client: TestClient, auth_headers: dict):
-        """E-002: Create phase with empty todos list."""
+        """E-002: Create phase with empty todos list fails."""
         task_data = {
             "name": "Phase without Todos",
             "phases": [
@@ -486,25 +495,18 @@ class TestEdgeCases:
         }
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
-        data = response.json()
-
-        assert response.status_code == 200
-        assert len(data["phases"]) == 1
-        assert len(data["phases"][0]["todos"]) == 0
+        assert response.status_code == 400
+        assert "at least one todo" in response.json()["detail"].lower()
 
     def test_progress_with_no_phases(self, client: TestClient, auth_headers: dict):
-        """E-003: Division by zero protection."""
+        """E-003: Task creation fails with no phases."""
         task_data = {"name": "No Phases", "phases": []}
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
-        data = response.json()
-
-        # Should not error, progress should be 0
-        assert response.status_code == 200
-        assert data["progress_percent"] == 0
+        assert response.status_code == 400
 
     def test_progress_with_no_todos(self, client: TestClient, auth_headers: dict):
-        """E-004: Empty phase handling."""
+        """E-004: Task creation fails with phase but no todos."""
         task_data = {
             "name": "No Todos",
             "phases": [
@@ -518,11 +520,7 @@ class TestEdgeCases:
         }
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
-        data = response.json()
-
-        # Should handle gracefully
-        assert response.status_code == 200
-        assert data["progress_percent"] == 0
+        assert response.status_code == 400
 
     def test_update_todo_not_found(self, client: TestClient, auth_headers: dict):
         """Test updating non-existent todo."""
@@ -657,10 +655,15 @@ class TestSystemComments:
         self, client: TestClient, auth_headers: dict
     ):
         """Test that system comment is created when task is created."""
-        task_data = {"name": "Comment Test Task", "phases": []}
+        task_data = {
+            "name": "Comment Test Task", 
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        }
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
-        task_id = response.json()["id"]
+        data = response.json()
+        assert response.status_code == 200
+        task_id = data["id"]
 
         # Check comments
         response = client.get(f"/tasks/{task_id}/comments")

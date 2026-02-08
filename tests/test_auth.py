@@ -56,7 +56,11 @@ class TestBearerTokenAuth:
         """Test that POST /tasks/ works with valid Bearer token."""
         response = client.post(
             "/tasks/",
-            json={"name": "Test Task", "interval_minutes": 10.0},
+            json={
+                "name": "Test Task", 
+                "interval_minutes": 10.0,
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            },
             headers=auth_headers,
         )
         data = response.json()

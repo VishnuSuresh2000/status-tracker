@@ -44,7 +44,11 @@ def test_full_task_notification_lifecycle(
     # 1. Create a task
     response = client.post(
         "/tasks/",
-        json={"name": "Integration Test Task", "interval_minutes": 1.0},
+        json={
+            "name": "Integration Test Task", 
+            "interval_minutes": 1.0,
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+        },
         headers=auth_headers,
     )
     assert response.status_code == 200
