@@ -11,6 +11,7 @@ services:
       - REDIS_HOST=redis
       - HOST_NAME=${HOST_NAME}
       - API_AUTH_TOKEN=${API_AUTH_TOKEN}
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./data:/app/data
     networks:
@@ -38,11 +39,12 @@ services:
       - redis
     environment:
       - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./data:/app/data
     networks:
       - traefik
-    command: ["uv", "run", "python", "worker.py"]
+    command: ["python", "worker.py"]
 
 networks:
   traefik:

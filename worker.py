@@ -2,7 +2,7 @@ import time
 import os
 from sqlmodel import Session, create_engine, select
 from sqlalchemy import desc
-from main import Agent, Task, TaskAssignment
+from main import Agent, Task, TaskAssignment, Comment
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from notifications import send_task_reminder, send_task_completion_notification
@@ -141,6 +141,14 @@ class PingWorker:
         task.last_agent_acknowledgment = None
         task.last_ping = datetime.now(timezone.utc)
         session.add(task)
+
+        # Create comment about escalation
+        comment = Comment(
+            task_id=task.id,
+            text=f"Task escalated from {from_agent.name} to {to_agent.name} due to timeout.",
+            author="system",
+        )
+        session.add(comment)
         session.commit()
 
         print(
@@ -159,12 +167,9 @@ class PingWorker:
 
 
 def worker():
-    print("[WORKER] Notification worker started...")
-    print("[WORKER] Checking for in-progress tasks every 30 seconds")
-
-    while True:
-        check_and_notify_tasks()
-        time.sleep(30)  # Check every 30 seconds
+    print("[WORKER] Enhanced ping worker started...")
+    ping_worker = PingWorker()
+    ping_worker.run()
 
 
 if __name__ == "__main__":
