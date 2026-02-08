@@ -26,12 +26,12 @@ jobs:
       - name: Setup test environment
         run: |
           mkdir -p data
-          echo "API_AUTH_TOKEN=test-token" >> .env
+          echo "API_AUTH_TOKEN=test-auth-token-for-tests" >> .env
           echo "REDIS_HOST=localhost" >> .env
           uv run python -c "from main import create_db_and_tables; create_db_and_tables()"
       - name: Run tests
         env:
-          API_AUTH_TOKEN: test-token
+          API_AUTH_TOKEN: test-auth-token-for-tests
           CI: true
         run: uv run pytest --ignore=tests/test_ui.py --junitxml=test-results.xml
       - name: Upload test results

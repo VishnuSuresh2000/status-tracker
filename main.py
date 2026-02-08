@@ -11,8 +11,9 @@ from typing import List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file if not already set
+if not os.getenv("API_AUTH_TOKEN"):
+    load_dotenv()
 
 from contextlib import asynccontextmanager
 from notifications import (

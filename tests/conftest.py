@@ -9,10 +9,15 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, StaticPool
 
 # Set test auth token BEFORE importing main
-# This ensures all tests use the same token consistently
 os.environ["API_AUTH_TOKEN"] = "test-auth-token-for-tests"
 
 from main import app, get_session
+
+
+@pytest.fixture(autouse=True)
+def env_setup(monkeypatch):
+    """Ensure environment variable is set consistently for all tests."""
+    monkeypatch.setenv("API_AUTH_TOKEN", "test-auth-token-for-tests")
 
 
 # Setup in-memory SQLite for testing
@@ -51,7 +56,8 @@ def client_fixture(session: Session):
     app.dependency_overrides[get_session] = get_session_override
     client = TestClient(app)
     yield client
-    app.dependency_overrides.clear()
+    # Restore global override
+    app.dependency_overrides[get_session] = override_get_session
 
 
 @pytest.fixture(name="auth_headers")

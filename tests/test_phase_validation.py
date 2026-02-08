@@ -3,58 +3,8 @@
 Validates that tasks must have at least one phase when created via POST /tasks/.
 """
 
-import os
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine, StaticPool
-
-# Set test auth token BEFORE importing main
-os.environ["API_AUTH_TOKEN"] = "test-auth-token-for-tests"
-
-from main import app, get_session
-
-# Test database (in-memory)
-test_engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-
-def override_get_session():
-    with Session(test_engine) as session:
-        yield session
-
-
-app.dependency_overrides[get_session] = override_get_session
-
-
-@pytest.fixture(name="session")
-def session_fixture():
-    """Create tables before each test session, drop after."""
-    SQLModel.metadata.create_all(test_engine)
-    with Session(test_engine) as session:
-        yield session
-    SQLModel.metadata.drop_all(test_engine)
-
-
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    """Create a test client with the session override."""
-
-    def get_session_override():
-        return session
-
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture(name="auth_headers")
-def auth_headers_fixture():
-    """Return valid authentication headers."""
-    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 class TestPhaseValidation:
