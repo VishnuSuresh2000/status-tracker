@@ -655,10 +655,11 @@ def read_task(task_id: int, session: Session = Depends(get_session)):
 def update_task(
     task_id: int,
     status: Optional[str] = None,
+    progress_percent: Optional[int] = None,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token),
 ):
-    """Update task status (legacy endpoint)."""
+    """Update task status and progress (legacy endpoint)."""
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -666,10 +667,17 @@ def update_task(
     if status:
         task.status = status
         task.last_ping = datetime.now(timezone.utc)
-        session.add(task)
-        session.commit()
-        session.refresh(task)
+        # Auto-set progress to 100% when marking as done
+        if status == "done" and task.progress_percent < 100:
+            task.progress_percent = 100
         create_system_comment(task_id, f"Task status updated to '{status}'", session)
+
+    if progress_percent is not None:
+        task.progress_percent = max(0, min(100, progress_percent))
+
+    session.add(task)
+    session.commit()
+    session.refresh(task)
 
     return task
 
