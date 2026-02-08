@@ -464,17 +464,30 @@
                  </div>` : '';
 
             const { agentSkills, taskSkills } = parseSkills(task.skills);
-            const allSkills = [...agentSkills.map(s => ({ type: 'agent', name: s })), ...taskSkills.map(s => ({ type: 'task', name: s }))];
             
-            const skillsDisplay = allSkills.length > 0 ?
-                `<div class="flex flex-wrap gap-1.5 mb-3 max-w-full">
-                    ${allSkills.slice(0, 4).map(s => {
-                        const bgClass = s.type === 'agent' ? 'bg-indigo-100' : 'bg-amber-100';
-                        const textClass = s.type === 'agent' ? 'text-indigo-700' : 'text-amber-700';
-                        return `<span class="px-2 py-0.5 ${bgClass} ${textClass} text-[9px] rounded-full font-medium truncate max-w-[100px] sm:max-w-[120px]" title="${s.name}">${s.name}</span>`;
-                    }).join('')}
-                    ${allSkills.length > 4 ? `<span class="text-[9px] text-gray-400 flex items-center">+${allSkills.length - 4}</span>` : ''}
-                 </div>` : '';
+            // Agent Skills with label
+            const agentSkillsDisplay = agentSkills.length > 0 ?
+                `<div class="mb-2">
+                    <span class="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide mr-1">Agent:</span>
+                    <div class="flex flex-wrap gap-1 mt-0.5 inline-flex">
+                        ${agentSkills.slice(0, 3).map(s => 
+                            `<span class="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">${s.trim()}</span>`
+                        ).join('')}
+                        ${agentSkills.length > 3 ? `<span class="text-xs text-indigo-500 px-1">+${agentSkills.length - 3}</span>` : ''}
+                    </div>
+                </div>` : '';
+            
+            // Task Skills with label
+            const taskSkillsDisplay = taskSkills.length > 0 ?
+                `<div class="mb-2">
+                    <span class="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mr-1">Skills:</span>
+                    <div class="flex flex-wrap gap-1 mt-0.5 inline-flex">
+                        ${taskSkills.slice(0, 3).map(s => 
+                            `<span class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">${s.trim()}</span>`
+                        ).join('')}
+                        ${taskSkills.length > 3 ? `<span class="text-xs text-amber-500 px-1">+${taskSkills.length - 3}</span>` : ''}
+                    </div>
+                </div>` : '';
 
             div.innerHTML = `
                 ${pingIndicator}
@@ -486,7 +499,8 @@
                 
                 ${task.description ? `<p class="text-xs text-gray-500 line-clamp-2 mb-2">${task.description}</p>` : ''}
                 
-                ${skillsDisplay}
+                ${agentSkillsDisplay}
+                ${taskSkillsDisplay}
 
                 <div class="mt-auto pt-2">
                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -543,18 +557,19 @@
                     const { agentSkills, taskSkills } = parseSkills(task.skills);
                     
                     if (agentSkills.length > 0) {
-                        meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Agent Skills:</span>';
+                        meta.innerHTML += '<div class="mt-2"><span class="text-xs font-bold text-indigo-600 uppercase tracking-wide mr-2">Agent Skills</span>';
                         agentSkills.forEach(skill => {
-                            meta.innerHTML += `<span class="text-xs text-indigo-700 px-2 py-0.5 rounded-full bg-indigo-100 mr-1">${skill.trim()}</span>`;
+                            meta.innerHTML += `<span class="text-xs text-indigo-700 px-2.5 py-1 rounded-full bg-indigo-100 mr-1 font-medium">${skill.trim()}</span>`;
                         });
+                        meta.innerHTML += '</div>';
                     }
                     
                     if (taskSkills.length > 0) {
-                        if (agentSkills.length > 0) meta.innerHTML += '<br class="mb-1">';
-                        meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Task Skills:</span>';
+                        meta.innerHTML += '<div class="mt-2"><span class="text-xs font-bold text-amber-600 uppercase tracking-wide mr-2">Task Skills</span>';
                         taskSkills.forEach(skill => {
-                            meta.innerHTML += `<span class="text-xs text-amber-700 px-2 py-0.5 rounded-full bg-amber-100 mr-1">${skill.trim()}</span>`;
+                            meta.innerHTML += `<span class="text-xs text-amber-700 px-2.5 py-1 rounded-full bg-amber-100 mr-1 font-medium">${skill.trim()}</span>`;
                         });
+                        meta.innerHTML += '</div>';
                     }
                 }
 
