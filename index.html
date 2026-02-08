@@ -265,9 +265,15 @@
                 </div>
             </div>
             
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Agent Skills <span class="text-gray-400 text-xs">(comma-separated)</span></label>
-                <textarea id="editTaskSkills" rows="2" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="e.g., opencode-controller, github, nano-banana-pro"></textarea>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Agent Skills <span class="text-gray-400 text-xs">(comma-separated)</span></label>
+                    <textarea id="editTaskAgentSkills" rows="2" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="e.g., opencode-controller, github"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Task Skills <span class="text-gray-400 text-xs">(comma-separated)</span></label>
+                    <textarea id="editTaskTaskSkills" rows="2" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="e.g., nano-banana-pro, database"></textarea>
+                </div>
             </div>
             
             <div class="mb-4">
@@ -297,6 +303,52 @@
         let currentTaskId = null;
         let agentsList = [];
         let showingAllDone = true;
+
+        // Helper functions for parsing and combining skills
+        function parseSkills(skillsString) {
+            if (!skillsString || !skillsString.trim()) {
+                return { agentSkills: [], taskSkills: [] };
+            }
+            
+            const skills = skillsString.split(',').map(s => s.trim()).filter(Boolean);
+            const agentSkills = [];
+            const taskSkills = [];
+            
+            skills.forEach(skill => {
+                if (skill.toLowerCase().startsWith('agent:')) {
+                    agentSkills.push(skill.substring(6).trim());
+                } else if (skill.toLowerCase().startsWith('task:')) {
+                    taskSkills.push(skill.substring(5).trim());
+                } else {
+                    // Default to task skills if no prefix
+                    taskSkills.push(skill);
+                }
+            });
+            
+            return { agentSkills, taskSkills };
+        }
+
+        function combineSkills(agentSkills, taskSkills) {
+            const skills = [];
+            
+            if (agentSkills && agentSkills.length > 0) {
+                agentSkills.forEach(skill => {
+                    if (skill.trim()) {
+                        skills.push('agent:' + skill.trim());
+                    }
+                });
+            }
+            
+            if (taskSkills && taskSkills.length > 0) {
+                taskSkills.forEach(skill => {
+                    if (skill.trim()) {
+                        skills.push('task:' + skill.trim());
+                    }
+                });
+            }
+            
+            return skills.join(',');
+        }
 
         function showAllDone() {
             showingAllDone = true;
@@ -400,10 +452,17 @@
                     <span>${task.agent_name}</span>
                  </div>` : '';
 
-            const skillsDisplay = task.skills ? 
+            const { agentSkills, taskSkills } = parseSkills(task.skills);
+            const allSkills = [...agentSkills.map(s => ({ type: 'agent', name: s })), ...taskSkills.map(s => ({ type: 'task', name: s }))];
+            
+            const skillsDisplay = allSkills.length > 0 ? 
                 `<div class="flex flex-wrap gap-1 mb-3">
-                    ${task.skills.split(',').slice(0, 3).map(s => `<span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] rounded border border-indigo-100">${s.trim()}</span>`).join('')}
-                    ${task.skills.split(',').length > 3 ? `<span class="text-[9px] text-gray-400">+${task.skills.split(',').length - 3}</span>` : ''}
+                    ${allSkills.slice(0, 3).map(s => {
+                        const bgClass = s.type === 'agent' ? 'bg-indigo-100' : 'bg-amber-100';
+                        const textClass = s.type === 'agent' ? 'text-indigo-700' : 'text-amber-700';
+                        return `<span class="px-2 py-0.5 ${bgClass} ${textClass} text-[9px] rounded-full font-medium">${s.name}</span>`;
+                    }).join('')}
+                    ${allSkills.length > 3 ? `<span class="text-[9px] text-gray-400">+${allSkills.length - 3}</span>` : ''}
                  </div>` : '';
 
             div.innerHTML = `
@@ -470,10 +529,22 @@
                 }
 
                 if (task.skills) {
-                    meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Skills:</span>';
-                    task.skills.split(',').forEach(skill => {
-                        meta.innerHTML += `<span class="text-xs text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 mr-1">${skill.trim()}</span>`;
-                    });
+                    const { agentSkills, taskSkills } = parseSkills(task.skills);
+                    
+                    if (agentSkills.length > 0) {
+                        meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Agent Skills:</span>';
+                        agentSkills.forEach(skill => {
+                            meta.innerHTML += `<span class="text-xs text-indigo-700 px-2 py-0.5 rounded-full bg-indigo-100 mr-1">${skill.trim()}</span>`;
+                        });
+                    }
+                    
+                    if (taskSkills.length > 0) {
+                        if (agentSkills.length > 0) meta.innerHTML += '<br class="mb-1">';
+                        meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Task Skills:</span>';
+                        taskSkills.forEach(skill => {
+                            meta.innerHTML += `<span class="text-xs text-amber-700 px-2 py-0.5 rounded-full bg-amber-100 mr-1">${skill.trim()}</span>`;
+                        });
+                    }
                 }
 
                 if (task.context_tags) {
@@ -536,20 +607,23 @@
                 const chartDiv = document.getElementById('mermaidChart');
                 if (task.flow_chart) {
                     flowSection.classList.remove('hidden');
-                    // Reset div content to raw definition
-                    chartDiv.innerHTML = `<pre class="mermaid">${task.flow_chart}</pre>`;
-                    chartDiv.removeAttribute('data-processed'); // Clear processed flag
+                    // Clear previous content and reset mermaid
+                    chartDiv.innerHTML = '';
+                    chartDiv.removeAttribute('data-processed');
                     
-                    // Re-run mermaid
+                    // Create a unique ID for this chart
+                    const chartId = 'mermaid-chart-' + Date.now();
+                    
                     try {
-                        await mermaid.run({ nodes: [chartDiv] });
+                        // Render mermaid chart
+                        const { svg } = await mermaid.render(chartId, task.flow_chart);
+                        chartDiv.innerHTML = svg;
                     } catch (err) {
                         console.error('Mermaid render error:', err);
-                        chartDiv.innerHTML = `<p class="text-red-500 text-xs">Error rendering chart</p><pre class="text-[10px] overflow-auto mt-2">${task.flow_chart}</pre>`;
+                        chartDiv.innerHTML = `<p class="text-red-500 text-xs">Error rendering chart</p><pre class="text-[10px] overflow-auto mt-2 bg-gray-100 p-2 rounded">${task.flow_chart}</pre>`;
                     }
                 } else {
-                    flowSection.classList.remove('hidden');
-                    chartDiv.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">📊 Flowchart not required for this task</p>';
+                    flowSection.classList.add('hidden');
                 }
 
                 // Action Button Logic
@@ -664,14 +738,17 @@
                 const task = await response.json();
                 document.getElementById('editTaskDescription').value = task.description || '';
                 document.getElementById('editTaskPriority').value = task.priority || 'medium';
-                document.getElementById('editTaskSkills').value = task.skills || '';
+                const { agentSkills, taskSkills } = parseSkills(task.skills || '');
+                document.getElementById('editTaskAgentSkills').value = agentSkills.join(', ');
+                document.getElementById('editTaskTaskSkills').value = taskSkills.join(', ');
                 document.getElementById('editTaskFlowchart').value = task.flow_chart || '';
                 document.getElementById('edit-task-agent').value = task.assigned_agent_id || '';
             } catch (e) {
                 console.error("Failed to fetch task details for editing:", e);
                 document.getElementById('editTaskDescription').value = '';
                 document.getElementById('editTaskPriority').value = 'medium';
-                document.getElementById('editTaskSkills').value = '';
+                document.getElementById('editTaskAgentSkills').value = '';
+                document.getElementById('editTaskTaskSkills').value = '';
                 document.getElementById('editTaskFlowchart').value = '';
                 document.getElementById('edit-task-agent').value = '';
             }
@@ -689,7 +766,9 @@
             const description = document.getElementById('editTaskDescription').value;
             const priority = document.getElementById('editTaskPriority').value;
             const interval = document.getElementById('editTaskInterval').value;
-            const skills = document.getElementById('editTaskSkills').value;
+            const agentSkills = document.getElementById('editTaskAgentSkills').value.split(',').map(s => s.trim()).filter(Boolean);
+            const taskSkills = document.getElementById('editTaskTaskSkills').value.split(',').map(s => s.trim()).filter(Boolean);
+            const skills = combineSkills(agentSkills, taskSkills);
             const flowchart = document.getElementById('editTaskFlowchart').value;
             const agentId = document.getElementById('edit-task-agent').value;
 
