@@ -306,6 +306,57 @@ curl -H "Authorization: Bearer $API_AUTH_TOKEN" \
      http://localhost:8000/tasks/
 ```
 
+## 🗿 Ruto's Auto-Task Detection Rules
+
+Ruto (the AI assistant) automatically creates and tracks tasks based on conversation context. These rules are visible in the UI under the collapsible "Auto-Task Detection Rules" panel.
+
+### Auto-Create Task When:
+
+| Trigger | Description |
+|---------|-------------|
+| **Multi-step work** | Any request requiring 3+ actions |
+| **Time investment** | Work estimated to take 15+ minutes |
+| **Project phases** | Requests mentioning phases, milestones, or stages |
+| **Recurring work** | Tasks that need periodic attention |
+| **Explicit request** | "track this", "create a task", "add to tracker" |
+
+### Skip Task Creation When:
+
+- Simple questions (single answer)
+- Quick lookups (read file, check status)
+- Casual conversation
+- Immediate one-step actions
+
+### Task Creation Template:
+
+```json
+{
+  "name": "[Clear action-oriented title]",
+  "priority": "medium",  // "high" if urgent/important
+  "phases": [...],       // Break into steps if complex
+  "description": "Context and goal"
+}
+```
+
+### Auto-Update Triggers:
+
+| Event | Action |
+|-------|--------|
+| **Start work** | Set status to `in_progress` |
+| **Complete milestone** | Mark phase/todo done, add comment |
+| **Finish task** | Set status to `done`, add summary |
+| **Blockers** | Add comment explaining issue |
+
+### API Script Usage:
+
+```bash
+cd /home/node/.openclaw/workspace/status-tracker
+TRACKER_AUTH_TOKEN="your-token" python scripts/tracker_api.py <command>
+
+# Commands: list, create, get, update, status, comment, delete
+```
+
+
 ## Changelog
 
 ### Phase 1 (Completed)

@@ -74,6 +74,85 @@
             </div>
         </div>
 
+        <!-- Ruto's Auto-Task Detection Rules -->
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow-md mb-8 border-t-4 border-purple-600">
+            <button onclick="toggleHelpPanel()" class="w-full flex justify-between items-center text-left">
+                <h2 class="text-xl font-semibold flex items-center gap-2">
+                    <span class="text-2xl">🗿</span>
+                    Ruto's Auto-Task Detection Rules
+                </h2>
+                <svg id="helpPanelChevron" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div id="helpPanel" class="hidden mt-4 space-y-4">
+                <!-- Trigger Conditions -->
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <h3 class="font-bold text-green-800 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Auto-Create Task When:
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-1 ml-7 list-disc">
+                        <li><strong>Multi-step work</strong> — Any request requiring 3+ actions</li>
+                        <li><strong>Time investment</strong> — Work estimated to take 15+ minutes</li>
+                        <li><strong>Project phases</strong> — Requests mentioning phases, milestones, or stages</li>
+                        <li><strong>Recurring work</strong> — Tasks that need periodic attention</li>
+                        <li><strong>Explicit request</strong> — "track this", "create a task", "add to tracker"</li>
+                    </ul>
+                </div>
+                
+                <!-- Skip Conditions -->
+                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <h3 class="font-bold text-red-800 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Skip Task Creation When:
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-1 ml-7 list-disc">
+                        <li>Simple questions (single answer)</li>
+                        <li>Quick lookups (read file, check status)</li>
+                        <li>Casual conversation</li>
+                        <li>Immediate one-step actions</li>
+                    </ul>
+                </div>
+                
+                <!-- Task Template -->
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h3 class="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Task Creation Template:
+                    </h3>
+                    <pre class="text-xs text-gray-700 bg-white p-3 rounded border overflow-x-auto"><code>{
+  "name": "[Clear action-oriented title]",
+  "priority": "medium",  // high if urgent/important
+  "phases": [...],       // Break into steps if complex
+  "description": "Context and goal"
+}</code></pre>
+                </div>
+                
+                <!-- Update Triggers -->
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h3 class="font-bold text-yellow-800 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Auto-Update Triggers:
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-1 ml-7 list-disc">
+                        <li><strong>Start work</strong> → Set status to <code class="bg-gray-200 px-1 rounded">in_progress</code></li>
+                        <li><strong>Complete milestone</strong> → Mark phase/todo done, add comment</li>
+                        <li><strong>Finish task</strong> → Set status to <code class="bg-gray-200 px-1 rounded">done</code>, add summary</li>
+                        <li><strong>Blockers</strong> → Add comment explaining issue</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- Task Columns -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Todo Column -->
@@ -613,6 +692,18 @@
                 fetchNotifications();
             } else {
                 panel.classList.add('hidden');
+            }
+        }
+
+        function toggleHelpPanel() {
+            const panel = document.getElementById('helpPanel');
+            const chevron = document.getElementById('helpPanelChevron');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                chevron.classList.add('rotate-180');
+            } else {
+                panel.classList.add('hidden');
+                chevron.classList.remove('rotate-180');
             }
         }
 
