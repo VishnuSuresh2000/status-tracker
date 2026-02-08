@@ -61,8 +61,7 @@ def client_fixture(session: Session):
 @pytest.fixture(name="auth_headers")
 def auth_headers_fixture():
     """Return valid authentication headers for API calls."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 class TestAddNotification:
@@ -238,12 +237,12 @@ class TestNotificationAPIEndpoints:
         """Verify PATCH /notifications/{id}/read works correctly."""
         # Create a task first
         response = client.post(
-            "/tasks/", 
+            "/tasks/",
             json={
                 "name": "API Test Task",
-                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
-            }, 
-            headers=auth_headers
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
+            },
+            headers=auth_headers,
         )
         assert response.status_code == 200
         task_id = response.json()["id"]
@@ -286,12 +285,12 @@ class TestNotificationAPIEndpoints:
         """Verify that marking as read actually updates the is_read field in database."""
         # Create a task
         response = client.post(
-            "/tasks/", 
+            "/tasks/",
             json={
                 "name": "DB Test Task",
-                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
-            }, 
-            headers=auth_headers
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
+            },
+            headers=auth_headers,
         )
         assert response.status_code == 200
         task_id = response.json()["id"]

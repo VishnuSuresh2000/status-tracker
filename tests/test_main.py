@@ -1,11 +1,8 @@
-import os
-
-# Set test auth token BEFORE importing main
-os.environ["API_AUTH_TOKEN"] = "test-auth-token-for-tests"
+"""Tests for main application endpoints."""
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine, StaticPool
-from main import app, get_session, Task
+from sqlmodel import Session
+from main import Task
 import pytest
 
 # Minimal task payload with required phase
@@ -16,53 +13,10 @@ MINIMAL_TASK = {
             "name": "Default Phase",
             "status": "todo",
             "order": 1,
-            "todos": [
-                {"name": "Default Todo", "status": "todo"}
-            ]
+            "todos": [{"name": "Default Todo", "status": "todo"}],
         }
-    ]
+    ],
 }
-
-# Setup in-memory SQLite for testing
-engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-
-def override_get_session():
-    with Session(engine) as session:
-        yield session
-
-
-app.dependency_overrides[get_session] = override_get_session
-
-
-@pytest.fixture(name="session")
-def session_fixture():
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
-    SQLModel.metadata.drop_all(engine)
-
-
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    def get_session_override():
-        return session
-
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture(name="auth_headers")
-def auth_headers_fixture():
-    """Return valid authentication headers for POST /tasks/."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_create_task(client: TestClient, auth_headers: dict):
@@ -77,9 +31,9 @@ def test_create_task(client: TestClient, auth_headers: dict):
                     "name": "Phase 1",
                     "status": "todo",
                     "order": 1,
-                    "todos": [{"name": "Todo 1", "status": "todo"}]
+                    "todos": [{"name": "Todo 1", "status": "todo"}],
                 }
-            ]
+            ],
         },
         headers=auth_headers,
     )
@@ -96,8 +50,36 @@ def test_create_task(client: TestClient, auth_headers: dict):
 
 
 def test_read_tasks(client: TestClient, auth_headers: dict):
-    client.post("/tasks/", json={"name": "Task 1", "phases": [{"name": "Phase 1", "status": "todo", "order": 1, "todos": [{"name": "Todo 1", "status": "todo"}]}]}, headers=auth_headers)
-    client.post("/tasks/", json={"name": "Task 2", "phases": [{"name": "Phase 1", "status": "todo", "order": 1, "todos": [{"name": "Todo 1", "status": "todo"}]}]}, headers=auth_headers)
+    client.post(
+        "/tasks/",
+        json={
+            "name": "Task 1",
+            "phases": [
+                {
+                    "name": "Phase 1",
+                    "status": "todo",
+                    "order": 1,
+                    "todos": [{"name": "Todo 1", "status": "todo"}],
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    client.post(
+        "/tasks/",
+        json={
+            "name": "Task 2",
+            "phases": [
+                {
+                    "name": "Phase 1",
+                    "status": "todo",
+                    "order": 1,
+                    "todos": [{"name": "Todo 1", "status": "todo"}],
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
 
     response = client.get("/tasks/")
     data = response.json()
@@ -111,17 +93,19 @@ def test_read_tasks(client: TestClient, auth_headers: dict):
 def test_update_task_legacy_status(client: TestClient, auth_headers: dict):
     """Test legacy PATCH /tasks/{id} endpoint updates task status field."""
     response = client.post(
-        "/tasks/", 
+        "/tasks/",
         json={
             "name": "Transition Task",
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
-        }, 
-        headers=auth_headers
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
+        },
+        headers=auth_headers,
     )
     task_id = response.json()["id"]
 
     # Legacy endpoint still accepts status parameter
-    response = client.patch(f"/tasks/{task_id}?status=in_progress", headers=auth_headers)
+    response = client.patch(
+        f"/tasks/{task_id}?status=in_progress", headers=auth_headers
+    )
     data = response.json()
 
     assert response.status_code == 200
@@ -132,12 +116,12 @@ def test_update_task_legacy_status(client: TestClient, auth_headers: dict):
 
 def test_delete_task(client: TestClient, auth_headers: dict):
     response = client.post(
-        "/tasks/", 
+        "/tasks/",
         json={
             "name": "Task to Delete",
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
-        }, 
-        headers=auth_headers
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
+        },
+        headers=auth_headers,
     )
     task_id = response.json()["id"]
 
@@ -165,9 +149,9 @@ def test_edit_task_name_only(client: TestClient, auth_headers: dict):
     response = client.post(
         "/tasks/",
         json={
-            "name": "Original Name", 
+            "name": "Original Name",
             "priority": "medium",
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
         },
         headers=auth_headers,
     )
@@ -185,15 +169,17 @@ def test_edit_task_interval_only(client: TestClient, auth_headers: dict):
     response = client.post(
         "/tasks/",
         json={
-            "name": "Task Name", 
+            "name": "Task Name",
             "interval_minutes": 10.0,
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
         },
         headers=auth_headers,
     )
     task_id = response.json()["id"]
 
-    response = client.put(f"/tasks/{task_id}?interval_minutes=30.0", headers=auth_headers)
+    response = client.put(
+        f"/tasks/{task_id}?interval_minutes=30.0", headers=auth_headers
+    )
     data = response.json()
 
     assert response.status_code == 200
@@ -205,15 +191,18 @@ def test_edit_task_both_fields(client: TestClient, auth_headers: dict):
     response = client.post(
         "/tasks/",
         json={
-            "name": "Original Name", 
+            "name": "Original Name",
             "interval_minutes": 10.0,
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
         },
         headers=auth_headers,
     )
     task_id = response.json()["id"]
 
-    response = client.put(f"/tasks/{task_id}?name=Updated Name&interval_minutes=45.0", headers=auth_headers)
+    response = client.put(
+        f"/tasks/{task_id}?name=Updated Name&interval_minutes=45.0",
+        headers=auth_headers,
+    )
     data = response.json()
 
     assert response.status_code == 200
@@ -318,7 +307,9 @@ def test_mark_notification_as_read(
     session.commit()
     session.refresh(notification)
 
-    response = client.patch(f"/notifications/{notification.id}/read", headers=auth_headers)
+    response = client.patch(
+        f"/notifications/{notification.id}/read", headers=auth_headers
+    )
     data = response.json()
 
     assert response.status_code == 200

@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse, Response
 from sqlmodel import SQLModel, Field, create_engine, Session, select, Relationship
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone, timedelta
 import redis
 import os
@@ -92,8 +93,7 @@ class Phase(SQLModel, table=True):
     # Relationships
     task: "Task" = Relationship(back_populates="phases")
     todos: List["Todo"] = Relationship(
-        back_populates="phase", 
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        back_populates="phase", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
 
@@ -476,17 +476,22 @@ def update_phase_status_from_todos(phase_id: int, session: Session) -> None:
 
 
 def update_todos_when_phase_completed(phase_id: int, session: Session) -> None:
-    """Mark all todos as done when phase is marked completed."""
+    """Mark all todos as done when phase is marked completed.
+
+    Note: This function does NOT commit the session. The caller is responsible for committing.
+    """
     phase = session.get(Phase, phase_id)
     if not phase:
         return
+
+    # Ensure todos are loaded before iterating
+    if not phase.todos:
+        session.refresh(phase, attribute_names=["todos"])
 
     for todo in phase.todos:
         if todo.status != "done":
             todo.status = "done"
             session.add(todo)
-
-    session.commit()
 
 
 # ============================================================================
@@ -510,14 +515,14 @@ r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
 # Security
 security = HTTPBearer()
-API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN")
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Verify that the request is from an authorized sub-agent."""
-    if not API_AUTH_TOKEN:
+    api_auth_token = os.getenv("API_AUTH_TOKEN")
+    if not api_auth_token:
         raise HTTPException(status_code=500, detail="API_AUTH_TOKEN not configured")
-    if credentials.credentials != API_AUTH_TOKEN:
+    if credentials.credentials != api_auth_token:
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing token",
@@ -543,7 +548,10 @@ async def serve_index():
     return Response(
         content=content,
         media_type="text/html",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        },
     )
 
 
@@ -561,16 +569,18 @@ def create_task(
     """Create a task with required nested phases and todos."""
     # Validate that at least one phase is provided
     if not task_data.phases or len(task_data.phases) == 0:
-        raise HTTPException(status_code=400, detail="At least one phase is required for task creation")
-    
+        raise HTTPException(
+            status_code=400, detail="At least one phase is required for task creation"
+        )
+
     # Validate that each phase has at least one todo
     for i, phase_data in enumerate(task_data.phases):
         if not phase_data.todos or len(phase_data.todos) == 0:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Phase '{phase_data.name}' (index {i}) must have at least one todo"
+                status_code=400,
+                detail=f"Phase '{phase_data.name}' (index {i}) must have at least one todo",
             )
-    
+
     task = Task(
         name=task_data.name,
         description=task_data.description,
@@ -680,7 +690,13 @@ def update_task(
     token: str = Depends(verify_token),
 ):
     """Update task status and progress (legacy endpoint)."""
-    task = session.get(Task, task_id)
+    # Eagerly load phases and their todos to ensure cascade logic works
+    statement = (
+        select(Task)
+        .where(Task.id == task_id)
+        .options(selectinload(Task.phases).selectinload(Phase.todos))
+    )
+    task = session.exec(statement).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -691,6 +707,14 @@ def update_task(
         if status == "done" and task.progress_percent < 100:
             task.progress_percent = 100
         create_system_comment(task_id, f"Task status updated to '{status}'", session)
+
+        # Cascade 'done' status to all phases and todos
+        if status == "done":
+            for phase in task.phases:
+                if phase.status != "completed":
+                    phase.status = "completed"
+                    session.add(phase)
+                    update_todos_when_phase_completed(phase.id, session)
 
     if progress_percent is not None:
         task.progress_percent = max(0, min(100, progress_percent))

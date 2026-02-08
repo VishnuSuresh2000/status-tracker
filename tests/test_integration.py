@@ -34,8 +34,7 @@ def client_fixture(session: Session):
 @pytest.fixture(name="auth_headers")
 def auth_headers_fixture():
     """Return valid authentication headers for POST /tasks/."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 def test_full_task_notification_lifecycle(
@@ -45,9 +44,9 @@ def test_full_task_notification_lifecycle(
     response = client.post(
         "/tasks/",
         json={
-            "name": "Integration Test Task", 
+            "name": "Integration Test Task",
             "interval_minutes": 1.0,
-            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+            "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
         },
         headers=auth_headers,
     )
@@ -56,7 +55,9 @@ def test_full_task_notification_lifecycle(
     task_id = task_data["id"]
 
     # 2. Move to in_progress
-    response = client.patch(f"/tasks/{task_id}", params={"status": "in_progress"}, headers=auth_headers)
+    response = client.patch(
+        f"/tasks/{task_id}", params={"status": "in_progress"}, headers=auth_headers
+    )
     assert response.status_code == 200
     # assert response.json()["status"] == "in_progress"  # status removed from TaskRead
 

@@ -45,8 +45,7 @@ def client_fixture(session: Session):
 @pytest.fixture
 def auth_headers():
     """Return valid authentication headers."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 class TestBearerTokenAuth:
@@ -57,9 +56,9 @@ class TestBearerTokenAuth:
         response = client.post(
             "/tasks/",
             json={
-                "name": "Test Task", 
+                "name": "Test Task",
                 "interval_minutes": 10.0,
-                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}]
+                "phases": [{"name": "P1", "todos": [{"name": "T1"}]}],
             },
             headers=auth_headers,
         )

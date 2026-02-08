@@ -55,8 +55,7 @@ def client_fixture(session: Session):
 @pytest.fixture(name="auth_headers")
 def auth_headers_fixture():
     """Return valid authentication headers for protected endpoints."""
-    token = os.getenv("API_AUTH_TOKEN", "secret-token-123")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-auth-token-for-tests"}
 
 
 @pytest.fixture(name="sample_agent")

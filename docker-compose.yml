@@ -39,6 +39,7 @@ services:
       - redis
     environment:
       - REDIS_HOST=redis
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN}
       - PYTHONUNBUFFERED=1
     volumes:
       - ./data:/app/data

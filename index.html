@@ -263,7 +263,7 @@
         const API_URL = '/tasks/';
         let currentTaskId = null;
         let agentsList = [];
-        let showingAllDone = false;
+        let showingAllDone = true;
 
         function showAllDone() {
             showingAllDone = true;
@@ -307,9 +307,9 @@
                 if (allDoneTasks.length > 5) {
                     doneLimitEl.classList.remove('hidden');
                     if (showingAllDone) {
-                        doneLimitEl.innerHTML = `Showing all ${allDoneTasks.length} <button onclick="hideOldDone()" class="text-blue-600 hover:underline ml-1">Show latest 5</button>`;
+                        doneLimitEl.innerHTML = `<span class="text-gray-600">Showing all ${allDoneTasks.length}</span> <button onclick="hideOldDone()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-medium ml-2 transition-colors">Show latest 5</button>`;
                     } else {
-                        doneLimitEl.innerHTML = `Showing latest 5 <button onclick="showAllDone()" class="text-blue-600 hover:underline ml-1">View all ${allDoneTasks.length}</button>`;
+                        doneLimitEl.innerHTML = `<span class="text-gray-600">Showing latest 5 of ${allDoneTasks.length}</span> <button onclick="showAllDone()" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-xs font-medium ml-2 transition-colors">View all</button>`;
                     }
                 } else {
                     doneLimitEl.classList.add('hidden');

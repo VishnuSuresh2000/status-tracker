@@ -45,12 +45,13 @@ def list_tasks(status=None):
     params = {"status": status} if status else None
     return api_call("GET", "/tasks/", params=params)
 
-def create_task(name, priority="medium", description=None, interval_minutes=60):
+def create_task(name, priority="medium", description=None, interval_minutes=60, **kwargs):
     """Create a new task."""
     data = {
         "name": name,
         "priority": priority,
-        "interval_minutes": interval_minutes
+        "interval_minutes": interval_minutes,
+        "phases": kwargs.get("phases", [])
     }
     if description:
         data["description"] = description
@@ -157,6 +158,7 @@ def main():
         print("  update <task_id> '<json>'     - Update task fields")
         print("  status <task_id> <status>     - Update task status")
         print("  comment <task_id> '<text>'    - Add comment")
+        print("  acknowledge <task_id>         - Acknowledge ping")
         print("  delete <task_id>              - Delete task")
         print("\nExamples:")
         print("  tracker_api.py list")
@@ -217,6 +219,14 @@ def main():
             print("Error: delete requires task_id")
             sys.exit(1)
         result = delete_task(int(sys.argv[2]))
+        print(json.dumps(result, indent=2))
+    
+    elif command == "acknowledge":
+        if len(sys.argv) < 3:
+            print("Error: acknowledge requires task_id")
+            sys.exit(1)
+        task_id = int(sys.argv[2])
+        result = acknowledge_ping(task_id)
         print(json.dumps(result, indent=2))
     
     else:
