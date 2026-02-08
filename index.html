@@ -155,7 +155,7 @@
         </div>
 
         <!-- Task Columns -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Todo Column -->
             <div>
                 <h3 class="font-bold text-gray-600 mb-4 uppercase tracking-wider flex items-center">
@@ -172,11 +172,8 @@
             </div>
             <!-- Done Column -->
             <div>
-                <h3 class="font-bold text-green-600 mb-4 uppercase tracking-wider flex items-center justify-between">
-                    <div class="flex items-center">
-                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Done <span id="doneCount" class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full"></span>
-                    </div>
-                    <span id="doneLimit" class="text-xs text-gray-400 font-normal hidden">Showing latest 5</span>
+                <h3 class="font-bold text-green-600 mb-4 uppercase tracking-wider flex items-center">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Done <span id="doneCount" class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full"></span>
                 </h3>
                 <div id="doneList" class="space-y-4"></div>
             </div>
@@ -184,9 +181,9 @@
     </div>
 
     <!-- Task Details Modal -->
-    <div id="detailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full flex flex-col modal-content">
-            <div class="p-6 border-b flex justify-between items-start">
+    <div id="detailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto">
+            <div class="p-4 sm:p-6 border-b flex justify-between items-start flex-shrink-0">
                 <div>
                     <h3 id="modalTaskName" class="text-2xl font-bold text-gray-800">Task Details</h3>
                     <div id="modalTaskMeta" class="flex gap-2 mt-1"></div>
@@ -194,17 +191,24 @@
                 <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             
-            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+            <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6 min-h-0">
                 <!-- Description -->
                 <section>
                     <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight mb-2">Description</h4>
-                    <p id="modalDescription" class="text-gray-700 whitespace-pre-wrap"></p>
+                    <p id="modalDescription" class="text-gray-700 whitespace-pre-wrap text-sm sm:text-base"></p>
                 </section>
 
                 <!-- Flow Chart -->
                 <section id="flowChartSection" class="hidden">
-                    <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight mb-2">Workflow</h4>
-                    <div id="mermaidChart" class="bg-gray-50 rounded border p-4 flex justify-center"></div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight">Workflow</h4>
+                        <div class="flex gap-1">
+                            <button onclick="zoomMermaid(1.2)" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors" title="Zoom In">+</button>
+                            <button onclick="zoomMermaid(0.8)" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors" title="Zoom Out">−</button>
+                            <button onclick="resetMermaidZoom()" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors" title="Reset">⟲</button>
+                        </div>
+                    </div>
+                    <div id="mermaidChart" class="bg-gray-50 rounded border p-2 sm:p-4 flex justify-center overflow-auto" style="max-height: 400px;"></div>
                 </section>
 
                 <!-- Phases & Todos -->
@@ -217,13 +221,13 @@
                 <section>
                     <div class="flex justify-between items-center mb-3">
                         <h4 class="text-sm font-bold text-gray-500 uppercase tracking-tight">Audit Log</h4>
-                        <button onclick="addCommentPrompt()" class="text-xs text-blue-600 hover:underline">+ Add Note</button>
+                        <button onclick="addCommentPrompt()" class="min-h-[44px] min-w-[44px] px-3 text-xs text-blue-600 hover:underline flex items-center">+ Add Note</button>
                     </div>
-                    <div id="commentsList" class="space-y-2 bg-gray-50 p-4 rounded border max-h-48 overflow-y-auto"></div>
+                    <div id="commentsList" class="space-y-2 bg-gray-50 p-3 sm:p-4 rounded border max-h-48 overflow-y-auto"></div>
                 </section>
             </div>
 
-            <div class="p-4 border-t bg-gray-50 flex justify-between items-center">
+            <div class="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 flex-shrink-0">
                 <div class="flex gap-2">
                     <button id="modalActionBtn" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"></button>
                     <button onclick="deleteCurrentTask()" class="text-red-600 px-4 py-2 rounded text-sm font-medium hover:bg-red-50 border border-red-200">Delete Task</button>
@@ -303,6 +307,7 @@
         let currentTaskId = null;
         let agentsList = [];
         let showingAllDone = true;
+        let visibleCompletedCount = 5;
 
         // Helper functions for parsing and combining skills
         function parseSkills(skillsString) {
@@ -350,21 +355,11 @@
             return skills.join(',');
         }
 
-        function showAllDone() {
-            showingAllDone = true;
-            fetchTasks();
-        }
-
-        function hideOldDone() {
-            showingAllDone = false;
-            fetchTasks();
-        }
-
         async function fetchTasks() {
             try {
                 const response = await fetch(API_URL);
                 const tasks = await response.json();
-                
+
                 const lists = {
                     todo: document.getElementById('todoList'),
                     in_progress: document.getElementById('inProgressList'),
@@ -377,28 +372,17 @@
                 // Separate done tasks, sort by most recent
                 const allDoneTasks = tasks.filter(t => t.status === 'done')
                     .sort((a, b) => new Date(b.last_ping || b.created_at) - new Date(a.last_ping || a.created_at));
-                
-                // Show all or just 5 based on toggle state
-                const doneTasks = showingAllDone ? allDoneTasks : allDoneTasks.slice(0, 5);
+
+                // Show only visibleCompletedCount completed tasks
+                const doneTasks = allDoneTasks.slice(0, visibleCompletedCount);
+
+                // Get all non-done tasks (pending and in_progress) - show all of them
                 const otherTasks = tasks.filter(t => t.status !== 'done');
 
                 // Update count badges
                 document.getElementById('todoCount').textContent = otherTasks.filter(t => t.status === 'todo').length;
                 document.getElementById('inProgressCount').textContent = otherTasks.filter(t => t.status === 'in_progress').length;
                 document.getElementById('doneCount').textContent = allDoneTasks.length;
-                
-                // Show toggle indicator if there are more than 5 done tasks
-                const doneLimitEl = document.getElementById('doneLimit');
-                if (allDoneTasks.length > 5) {
-                    doneLimitEl.classList.remove('hidden');
-                    if (showingAllDone) {
-                        doneLimitEl.innerHTML = `<span class="text-gray-600">Showing all ${allDoneTasks.length}</span> <button onclick="hideOldDone()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-medium ml-2 transition-colors">Show latest 5</button>`;
-                    } else {
-                        doneLimitEl.innerHTML = `<span class="text-gray-600">Showing latest 5 of ${allDoneTasks.length}</span> <button onclick="showAllDone()" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-xs font-medium ml-2 transition-colors">View all</button>`;
-                    }
-                } else {
-                    doneLimitEl.classList.add('hidden');
-                }
 
                 // Render done tasks
                 doneTasks.forEach(task => {
@@ -406,14 +390,41 @@
                     lists.done.appendChild(card);
                 });
 
-                // Render other tasks
+                // Render other tasks (all pending and in_progress)
                 otherTasks.forEach(task => {
                     const card = createTaskCard(task);
                     const container = lists[task.status] || lists.todo;
                     container.appendChild(card);
                 });
+
+                // Update "Load More" button visibility
+                updateLoadMoreButton(allDoneTasks.length, doneTasks.length);
             } catch (e) {
                 console.error("Fetch failed:", e);
+            }
+        }
+
+        function loadMoreCompletedTasks() {
+            visibleCompletedCount += 5;
+            fetchTasks();
+        }
+
+        function updateLoadMoreButton(totalCount, visibleCount) {
+            let loadMoreBtn = document.getElementById('loadMoreCompletedBtn');
+            if (!loadMoreBtn) {
+                // Create button if it doesn't exist
+                loadMoreBtn = document.createElement('button');
+                loadMoreBtn.id = 'loadMoreCompletedBtn';
+                loadMoreBtn.className = 'w-full mt-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-lg border border-blue-200 transition-colors';
+                loadMoreBtn.onclick = loadMoreCompletedTasks;
+                document.getElementById('doneList').parentNode.appendChild(loadMoreBtn);
+            }
+
+            if (visibleCount >= totalCount) {
+                loadMoreBtn.classList.add('hidden');
+            } else {
+                loadMoreBtn.classList.remove('hidden');
+                loadMoreBtn.textContent = `Load More Completed Tasks (${totalCount - visibleCount} remaining)`;
             }
         }
 
@@ -455,21 +466,21 @@
             const { agentSkills, taskSkills } = parseSkills(task.skills);
             const allSkills = [...agentSkills.map(s => ({ type: 'agent', name: s })), ...taskSkills.map(s => ({ type: 'task', name: s }))];
             
-            const skillsDisplay = allSkills.length > 0 ? 
-                `<div class="flex flex-wrap gap-1 mb-3">
-                    ${allSkills.slice(0, 3).map(s => {
+            const skillsDisplay = allSkills.length > 0 ?
+                `<div class="flex flex-wrap gap-1.5 mb-3 max-w-full">
+                    ${allSkills.slice(0, 4).map(s => {
                         const bgClass = s.type === 'agent' ? 'bg-indigo-100' : 'bg-amber-100';
                         const textClass = s.type === 'agent' ? 'text-indigo-700' : 'text-amber-700';
-                        return `<span class="px-2 py-0.5 ${bgClass} ${textClass} text-[9px] rounded-full font-medium">${s.name}</span>`;
+                        return `<span class="px-2 py-0.5 ${bgClass} ${textClass} text-[9px] rounded-full font-medium truncate max-w-[100px] sm:max-w-[120px]" title="${s.name}">${s.name}</span>`;
                     }).join('')}
-                    ${allSkills.length > 3 ? `<span class="text-[9px] text-gray-400">+${allSkills.length - 3}</span>` : ''}
+                    ${allSkills.length > 4 ? `<span class="text-[9px] text-gray-400 flex items-center">+${allSkills.length - 4}</span>` : ''}
                  </div>` : '';
 
             div.innerHTML = `
                 ${pingIndicator}
                 ${agentDisplay}
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 break-words group-hover:text-blue-600 transition-colors text-sm">${task.name}</h4>
+                <div class="flex justify-between items-start mb-2 gap-2">
+                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 truncate group-hover:text-blue-600 transition-colors text-sm" title="${task.name}">${task.name}</h4>
                     <span class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${pColor} ml-2 flex-shrink-0">${task.priority || 'medium'}</span>
                 </div>
                 
@@ -490,7 +501,7 @@
                 <div class="flex justify-between items-center pt-2 mt-2 border-t border-gray-50">
                     <div class="flex gap-2">
                         <button onclick="event.stopPropagation(); openEditModal(${task.id}, '${task.name.replace(/'/g, "\\'")}', ${task.interval_minutes})" 
-                                class="text-[10px] font-bold text-gray-400 hover:text-blue-600 flex items-center uppercase transition-colors">
+                                class="min-h-[44px] min-w-[44px] px-3 py-2 text-[10px] font-bold text-gray-400 hover:text-blue-600 flex items-center uppercase transition-colors">
                             Edit
                         </button>
                     </div>
@@ -980,6 +991,27 @@
                     option.textContent = agent.name;
                     dropdown.appendChild(option);
                 });
+            }
+        }
+
+        // Mermaid Zoom Controls
+        let mermaidZoomLevel = 1;
+        
+        function zoomMermaid(factor) {
+            mermaidZoomLevel *= factor;
+            mermaidZoomLevel = Math.max(0.5, Math.min(3, mermaidZoomLevel)); // Clamp between 0.5x and 3x
+            const svg = document.querySelector('#mermaidChart svg');
+            if (svg) {
+                svg.style.transform = `scale(${mermaidZoomLevel})`;
+                svg.style.transformOrigin = 'center top';
+            }
+        }
+        
+        function resetMermaidZoom() {
+            mermaidZoomLevel = 1;
+            const svg = document.querySelector('#mermaidChart svg');
+            if (svg) {
+                svg.style.transform = 'scale(1)';
             }
         }
 
