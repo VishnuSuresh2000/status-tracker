@@ -494,6 +494,34 @@ def update_todos_when_phase_completed(phase_id: int, session: Session) -> None:
             session.add(todo)
 
 
+def validate_task_can_be_completed(task: Task) -> tuple[bool, list[str]]:
+    """Validate that a task can be marked as done.
+    Returns (is_valid, list of incomplete phase names)."""
+    incomplete_phases = []
+    total_todos = 0
+    done_todos = 0
+
+    for phase in task.phases:
+        phase_todos = phase.todos
+        if phase_todos:
+            total_todos += len(phase_todos)
+            phase_done = sum(1 for t in phase_todos if t.status == "done")
+            done_todos += phase_done
+
+            if phase_done < len(phase_todos):
+                incomplete_phases.append(phase.name)
+
+    # Allow if task has no todos at all
+    if total_todos == 0:
+        return True, []
+
+    # Block if not all todos are done
+    if done_todos < total_todos:
+        return False, incomplete_phases
+
+    return True, []
+
+
 # ============================================================================
 # FASTAPI APP
 # ============================================================================
@@ -701,6 +729,22 @@ def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     if status:
+        # Validate task can be marked as done
+        if status == "done" and task.status != "done":
+            is_valid, incomplete_phases = validate_task_can_be_completed(task)
+            if not is_valid:
+                total_todos = sum(len(p.todos) for p in task.phases if p.todos)
+                done_todos = sum(
+                    sum(1 for t in p.todos if t.status == "done")
+                    for p in task.phases
+                    if p.todos
+                )
+                incomplete = len(incomplete_phases)
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cannot mark task as done - {total_todos - done_todos} of {total_todos} checklist items remain incomplete. Please complete all items in phases: {', '.join(incomplete_phases)}.",
+                )
+
         task.status = status
         task.last_ping = datetime.now(timezone.utc)
         # Auto-set progress to 100% when marking as done

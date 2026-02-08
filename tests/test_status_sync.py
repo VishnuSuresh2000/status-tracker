@@ -95,10 +95,19 @@ def test_task_done_cascades_to_phases_and_todos(client: TestClient, auth_headers
     )
     assert response.status_code == 200
     task_id = response.json()["id"]
+    phases = response.json()["phases"]
     initial_progress = response.json()["progress_percent"]
 
     # Verify initial state shows partial progress
     assert initial_progress < 100
+
+    # First complete all todos (required by validation)
+    for phase in phases:
+        for todo in phase["todos"]:
+            response = client.patch(
+                f"/todos/{todo['id']}", json={"status": "done"}, headers=auth_headers
+            )
+            assert response.status_code == 200
 
     # Mark the task as done via PATCH endpoint
     response = client.patch(f"/tasks/{task_id}?status=done", headers=auth_headers)
@@ -126,20 +135,22 @@ def test_task_done_cascades_to_phases_and_todos(client: TestClient, auth_headers
 
 def test_task_done_with_empty_phases(client: TestClient, auth_headers: dict):
     """
-    Test that marking a task as done works even when phases have no todos.
+    Test that marking a task as done works when phases have todos that are all done.
     """
-    # Create a task with a phase that has no todos
+    # Create a task with a phase that has todos
     response = client.post(
         "/tasks/",
         json={
-            "name": "Task With Empty Phase",
+            "name": "Task With Complete Phase",
             "priority": "medium",
             "phases": [
                 {
-                    "name": "Empty Phase",
+                    "name": "Complete Phase",
                     "status": "not_started",
                     "order": 1,
-                    "todos": [{"name": "Only Todo", "status": "todo"}],
+                    "todos": [
+                        {"name": "Todo 1", "status": "todo"},
+                    ],
                 },
             ],
         },
@@ -147,8 +158,16 @@ def test_task_done_with_empty_phases(client: TestClient, auth_headers: dict):
     )
     assert response.status_code == 200
     task_id = response.json()["id"]
+    phases = response.json()["phases"]
 
-    # Mark task as done
+    # Complete the todo first
+    todo_id = phases[0]["todos"][0]["id"]
+    response = client.patch(
+        f"/todos/{todo_id}", json={"status": "done"}, headers=auth_headers
+    )
+    assert response.status_code == 200
+
+    # Mark task as done (all todos are done)
     response = client.patch(f"/tasks/{task_id}?status=done", headers=auth_headers)
     assert response.status_code == 200
 
@@ -156,7 +175,6 @@ def test_task_done_with_empty_phases(client: TestClient, auth_headers: dict):
     assert data["status"] == "done"
     assert data["progress_percent"] == 100
     assert data["phases"][0]["status"] == "completed"
-    assert data["phases"][0]["todos"][0]["status"] == "done"
 
 
 def test_task_in_progress_does_not_cascade(client: TestClient, auth_headers: dict):
@@ -224,6 +242,14 @@ def test_task_done_idempotent(client: TestClient, auth_headers: dict):
     )
     assert response.status_code == 200
     task_id = response.json()["id"]
+    phases = response.json()["phases"]
+
+    # First complete the todo (required by validation)
+    todo_id = phases[0]["todos"][0]["id"]
+    response = client.patch(
+        f"/todos/{todo_id}", json={"status": "done"}, headers=auth_headers
+    )
+    assert response.status_code == 200
 
     # Mark task as done first time
     response = client.patch(f"/tasks/{task_id}?status=done", headers=auth_headers)
