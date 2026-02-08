@@ -93,10 +93,10 @@ class TestDashboardFunctionality:
         # Verify page title
         expect(page.locator("h1")).to_contain_text("Task Status Tracker")
 
-        # Verify all three columns are present
-        expect(page.locator("text=To Do")).to_be_visible()
-        expect(page.locator("text=In Progress")).to_be_visible()
-        expect(page.locator("text=Done")).to_be_visible()
+        # Verify all three columns are present (use role-based selectors to avoid matching text in help panel)
+        expect(page.get_by_role("heading", name="To Do")).to_be_visible()
+        expect(page.get_by_role("heading", name="In Progress")).to_be_visible()
+        expect(page.get_by_role("heading", name="Done")).to_be_visible()
 
     def test_add_task_form_exists(self, page: Page):
         """Test that the add task form is present."""
