@@ -1,7 +1,7 @@
 # Fixed CI build
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlmodel import SQLModel, Field, create_engine, Session, select, Relationship
 from datetime import datetime, timezone, timedelta
 import redis
@@ -535,8 +535,13 @@ def get_session():
 
 @app.get("/")
 async def serve_index():
-    """Serve the index.html file at the root path."""
-    return FileResponse("index.html")
+    """Serve the index.html file at the root path with no caching."""
+    content = open("index.html", "r").read()
+    return Response(
+        content=content,
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+    )
 
 
 # ============================================================================
