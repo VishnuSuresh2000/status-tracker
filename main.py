@@ -69,7 +69,10 @@ class Task(SQLModel, table=True):
     comments: List["Comment"] = Relationship(
         back_populates="task", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
-    assigned_agent: Optional["Agent"] = Relationship(back_populates="current_task")
+    assigned_agent: Optional["Agent"] = Relationship(
+        back_populates="current_task",
+        sa_relationship_kwargs={"foreign_keys": "[Task.assigned_agent_id]"},
+    )
     assignments: List["TaskAssignment"] = Relationship(back_populates="task")
 
 
@@ -126,7 +129,6 @@ class Agent(SQLModel, table=True):
     type: str = Field(default="sub_agent")  # main_agent, sub_agent
     status: str = Field(default="idle")  # idle, busy, working, offline
     last_acknowledgment: Optional[datetime] = Field(default=None)
-    current_task_id: Optional[int] = Field(default=None, foreign_key="tasks.id")
     capabilities: Optional[str] = Field(default=None)  # JSON or comma-separated
     endpoint_url: Optional[str] = Field(default=None)
     timeout_minutes: int = Field(default=30)
@@ -134,8 +136,13 @@ class Agent(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    current_task: Optional["Task"] = Relationship(back_populates="assigned_agent")
-    task_assignments: List["TaskAssignment"] = Relationship(back_populates="agent")
+    current_task: Optional["Task"] = Relationship(
+        back_populates="assigned_agent",
+    )
+    task_assignments: List["TaskAssignment"] = Relationship(
+        back_populates="agent",
+        sa_relationship_kwargs={"foreign_keys": "[TaskAssignment.agent_id]"},
+    )
 
 
 class TaskAssignment(SQLModel, table=True):
@@ -156,7 +163,10 @@ class TaskAssignment(SQLModel, table=True):
 
     # Relationships
     task: "Task" = Relationship(back_populates="assignments")
-    agent: "Agent" = Relationship(back_populates="task_assignments")
+    agent: "Agent" = Relationship(
+        back_populates="task_assignments",
+        sa_relationship_kwargs={"foreign_keys": "[TaskAssignment.agent_id]"},
+    )
     original_agent: Optional["Agent"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "TaskAssignment.original_agent_id"}
     )
@@ -261,6 +271,10 @@ class TaskRead(TaskBase):
     phases: List[PhaseRead] = []
     comments: List[CommentRead] = []
     unread_reminder_count: int = 0
+    assigned_agent_id: Optional[int] = None
+    ping_interval_minutes: int = 30
+    is_ping_enabled: bool = True
+    last_agent_acknowledgment: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -283,7 +297,6 @@ class AgentRead(AgentBase):
     id: int
     status: str
     last_acknowledgment: Optional[datetime]
-    current_task_id: Optional[int]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

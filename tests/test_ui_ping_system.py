@@ -7,8 +7,11 @@ import re
 from playwright.sync_api import Page, expect, BrowserContext
 import os
 
+# Ensure data directory exists before setting DATABASE_URL
+os.makedirs("./data", exist_ok=True)
+
 # Set environment variables BEFORE importing main or notifications
-os.environ["DATABASE_URL"] = "sqlite:///./data/test_ui.db"
+os.environ["DATABASE_URL"] = "sqlite:///./data/test_ui_ping.db"
 os.environ["API_AUTH_TOKEN"] = os.environ.get("AUTH_TOKEN", "my-secret-token")
 
 from main import app, engine, create_db_and_tables, Task, Phase
@@ -18,8 +21,8 @@ from datetime import datetime, timezone, timedelta
 from notifications import add_notification
 import notifications
 
-# Port for the test server
-TEST_PORT = 8002
+# Port for the test server (different from test_ui_playwright.py and test_ui.py)
+TEST_PORT = 8003
 TEST_URL = f"http://127.0.0.1:{TEST_PORT}"
 
 # Auth token for API calls (from environment or fallback)
@@ -29,7 +32,7 @@ AUTH_HEADERS = {"Authorization": f"Bearer {AUTH_TOKEN}"}
 
 def run_server():
     # Environment variables already set at module level above
-    # Re-initialize DB
+    # Re-initialize DB with unique path
     SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     uvicorn.run(app, host="127.0.0.1", port=TEST_PORT, log_level="error")
@@ -54,9 +57,9 @@ def server():
         pytest.fail("Server failed to start")
 
     yield
-    # Cleanup data/test_ui.db after tests if needed
-    if os.path.exists("./data/test_ui.db"):
-        os.remove("./data/test_ui.db")
+    # Cleanup data/test_ui_ping.db after tests if needed
+    if os.path.exists("./data/test_ui_ping.db"):
+        os.remove("./data/test_ui_ping.db")
 
 
 @pytest.fixture(autouse=True)
