@@ -160,9 +160,11 @@ class PingWorker:
             return True
 
         now = datetime.now(timezone.utc)
-        timeout_threshold = agent.last_acknowledgment + timedelta(
-            minutes=agent.timeout_minutes
-        )
+        last_ack = agent.last_acknowledgment
+        if last_ack.tzinfo is None:
+            last_ack = last_ack.replace(tzinfo=timezone.utc)
+
+        timeout_threshold = last_ack + timedelta(minutes=agent.timeout_minutes)
         return now > timeout_threshold
 
 

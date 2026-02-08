@@ -157,7 +157,7 @@ def test_edit_task_name_only(client: TestClient, auth_headers: dict):
     )
     task_id = response.json()["id"]
 
-    response = client.put(f"/tasks/{task_id}?name=Updated Name", headers=auth_headers)
+    response = client.put(f"/tasks/{task_id}", json={"name": "Updated Name"}, headers=auth_headers)
     data = response.json()
 
     assert response.status_code == 200
@@ -178,7 +178,7 @@ def test_edit_task_interval_only(client: TestClient, auth_headers: dict):
     task_id = response.json()["id"]
 
     response = client.put(
-        f"/tasks/{task_id}?interval_minutes=30.0", headers=auth_headers
+        f"/tasks/{task_id}", json={"interval_minutes": 30.0}, headers=auth_headers
     )
     data = response.json()
 
@@ -200,7 +200,8 @@ def test_edit_task_both_fields(client: TestClient, auth_headers: dict):
     task_id = response.json()["id"]
 
     response = client.put(
-        f"/tasks/{task_id}?name=Updated Name&interval_minutes=45.0",
+        f"/tasks/{task_id}",
+        json={"name": "Updated Name", "interval_minutes": 45.0},
         headers=auth_headers,
     )
     data = response.json()
@@ -211,7 +212,7 @@ def test_edit_task_both_fields(client: TestClient, auth_headers: dict):
 
 
 def test_edit_task_not_found(client: TestClient, auth_headers: dict):
-    response = client.put("/tasks/999?name=New Name", headers=auth_headers)
+    response = client.put("/tasks/999", json={"name": "New Name"}, headers=auth_headers)
     assert response.status_code == 404
     assert response.json()["detail"] == "Task not found"
 

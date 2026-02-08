@@ -235,23 +235,56 @@
 
     <!-- Edit Basic Info Modal -->
     <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[60] p-4">
-        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-            <h3 class="text-lg font-bold mb-4 text-gray-800">Edit Basic Info</h3>
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Edit Task</h3>
             <input type="hidden" id="editTaskId">
+            
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Task Name</label>
                 <input type="text" id="editTaskName" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
+            
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Interval (minutes)</label>
-                <input type="number" id="editTaskInterval" class="w-full p-2 border rounded">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea id="editTaskDescription" rows="3" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Task description..."></textarea>
             </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select id="editTaskPriority" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Interval (minutes)</label>
+                    <input type="number" id="editTaskInterval" class="w-full p-2 border rounded">
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Agent Skills <span class="text-gray-400 text-xs">(comma-separated)</span></label>
+                <textarea id="editTaskSkills" rows="2" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="e.g., opencode-controller, github, nano-banana-pro"></textarea>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Flowchart / Diagram <span class="text-gray-400 text-xs">(Mermaid syntax)</span></label>
+                <textarea id="editTaskFlowchart" rows="4" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-xs font-mono" placeholder="graph TD
+    A[Start] --> B[Plan]
+    B --> C[Build]
+    C --> D[Done]"></textarea>
+            </div>
+            
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Assigned Agent</label>
                 <select id="edit-task-agent" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="">Unassigned</option>
                 </select>
             </div>
+            
             <div class="flex justify-end gap-2">
                 <button onclick="closeEditModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">Cancel</button>
                 <button onclick="saveTaskEdit()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Changes</button>
@@ -437,6 +470,7 @@
                 }
 
                 if (task.skills) {
+                    meta.innerHTML += '<span class="text-[10px] text-gray-400 mr-1">Skills:</span>';
                     task.skills.split(',').forEach(skill => {
                         meta.innerHTML += `<span class="text-xs text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 mr-1">${skill.trim()}</span>`;
                     });
@@ -499,9 +533,9 @@
 
                 // Mermaid Chart
                 const flowSection = document.getElementById('flowChartSection');
+                const chartDiv = document.getElementById('mermaidChart');
                 if (task.flow_chart) {
                     flowSection.classList.remove('hidden');
-                    const chartDiv = document.getElementById('mermaidChart');
                     // Reset div content to raw definition
                     chartDiv.innerHTML = `<pre class="mermaid">${task.flow_chart}</pre>`;
                     chartDiv.removeAttribute('data-processed'); // Clear processed flag
@@ -514,7 +548,8 @@
                         chartDiv.innerHTML = `<p class="text-red-500 text-xs">Error rendering chart</p><pre class="text-[10px] overflow-auto mt-2">${task.flow_chart}</pre>`;
                     }
                 } else {
-                    flowSection.classList.add('hidden');
+                    flowSection.classList.remove('hidden');
+                    chartDiv.innerHTML = '<p class="text-xs text-gray-400 italic text-center py-4">📊 Flowchart not required for this task</p>';
                 }
 
                 // Action Button Logic
@@ -623,13 +658,21 @@
             document.getElementById('editTaskName').value = name;
             document.getElementById('editTaskInterval').value = interval;
             
-            // Fetch task details to get current agent assignment
+            // Fetch task details to populate all fields
             try {
                 const response = await fetch(`${API_URL}${taskId}`);
                 const task = await response.json();
+                document.getElementById('editTaskDescription').value = task.description || '';
+                document.getElementById('editTaskPriority').value = task.priority || 'medium';
+                document.getElementById('editTaskSkills').value = task.skills || '';
+                document.getElementById('editTaskFlowchart').value = task.flow_chart || '';
                 document.getElementById('edit-task-agent').value = task.assigned_agent_id || '';
             } catch (e) {
-                console.error("Failed to fetch task details for agent assignment:", e);
+                console.error("Failed to fetch task details for editing:", e);
+                document.getElementById('editTaskDescription').value = '';
+                document.getElementById('editTaskPriority').value = 'medium';
+                document.getElementById('editTaskSkills').value = '';
+                document.getElementById('editTaskFlowchart').value = '';
                 document.getElementById('edit-task-agent').value = '';
             }
             
@@ -643,14 +686,22 @@
         async function saveTaskEdit() {
             const taskId = document.getElementById('editTaskId').value;
             const name = document.getElementById('editTaskName').value;
+            const description = document.getElementById('editTaskDescription').value;
+            const priority = document.getElementById('editTaskPriority').value;
             const interval = document.getElementById('editTaskInterval').value;
+            const skills = document.getElementById('editTaskSkills').value;
+            const flowchart = document.getElementById('editTaskFlowchart').value;
             const agentId = document.getElementById('edit-task-agent').value;
 
             if (!name) return alert('Name is required');
 
             const body = {
                 name,
+                description,
+                priority,
                 interval_minutes: parseFloat(interval),
+                skills,
+                flow_chart: flowchart,
                 agent_id: agentId || null
             };
 

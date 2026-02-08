@@ -220,6 +220,17 @@ class PhaseUpdate(BaseModel):
     status: str
 
 
+# Task Edit Schema for PUT endpoint
+class TaskEditRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    interval_minutes: Optional[float] = None
+    skills: Optional[str] = None
+    flow_chart: Optional[str] = None
+    agent_id: Optional[int] = None
+
+
 class PhaseRead(PhaseBase):
     id: int
     task_id: int
@@ -790,20 +801,27 @@ def delete_task(
 @app.put("/tasks/{task_id}", response_model=TaskRead)
 def edit_task(
     task_id: int,
-    name: Optional[str] = None,
-    interval_minutes: Optional[float] = None,
+    edit_data: TaskEditRequest,
     session: Session = Depends(get_session),
     token: str = Depends(verify_token),
 ):
-    """Edit task fields (legacy endpoint)."""
+    """Edit task fields including description, priority, skills, and flowchart."""
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if name is not None:
-        task.name = name
-    if interval_minutes is not None:
-        task.interval_minutes = interval_minutes
+    if edit_data.name is not None:
+        task.name = edit_data.name
+    if edit_data.description is not None:
+        task.description = edit_data.description
+    if edit_data.priority is not None:
+        task.priority = edit_data.priority
+    if edit_data.interval_minutes is not None:
+        task.interval_minutes = edit_data.interval_minutes
+    if edit_data.skills is not None:
+        task.skills = edit_data.skills if edit_data.skills.strip() else None
+    if edit_data.flow_chart is not None:
+        task.flow_chart = edit_data.flow_chart if edit_data.flow_chart.strip() else None
 
     session.add(task)
     session.commit()
