@@ -262,6 +262,17 @@
         const API_URL = '/tasks/';
         let currentTaskId = null;
         let agentsList = [];
+        let showingAllDone = false;
+
+        function showAllDone() {
+            showingAllDone = true;
+            fetchTasks();
+        }
+
+        function hideOldDone() {
+            showingAllDone = false;
+            fetchTasks();
+        }
 
         async function fetchTasks() {
             try {
@@ -277,11 +288,12 @@
                 // Clear lists
                 Object.values(lists).forEach(list => list.innerHTML = '');
 
-                // Separate done tasks and limit to 5 most recent
-                const allDoneTasks = tasks.filter(t => t.status === 'done');
-                const doneTasks = allDoneTasks
-                    .sort((a, b) => new Date(b.last_ping || b.created_at) - new Date(a.last_ping || a.created_at))
-                    .slice(0, 5);
+                // Separate done tasks, sort by most recent
+                const allDoneTasks = tasks.filter(t => t.status === 'done')
+                    .sort((a, b) => new Date(b.last_ping || b.created_at) - new Date(a.last_ping || a.created_at));
+                
+                // Show all or just 5 based on toggle state
+                const doneTasks = showingAllDone ? allDoneTasks : allDoneTasks.slice(0, 5);
                 const otherTasks = tasks.filter(t => t.status !== 'done');
 
                 // Update count badges
@@ -289,16 +301,20 @@
                 document.getElementById('inProgressCount').textContent = otherTasks.filter(t => t.status === 'in_progress').length;
                 document.getElementById('doneCount').textContent = allDoneTasks.length;
                 
-                // Show "Showing latest 5" indicator if there are more than 5 done tasks
+                // Show toggle indicator if there are more than 5 done tasks
                 const doneLimitEl = document.getElementById('doneLimit');
                 if (allDoneTasks.length > 5) {
                     doneLimitEl.classList.remove('hidden');
-                    doneLimitEl.textContent = `Showing latest 5 of ${allDoneTasks.length}`;
+                    if (showingAllDone) {
+                        doneLimitEl.innerHTML = `Showing all ${allDoneTasks.length} <button onclick="hideOldDone()" class="text-blue-600 hover:underline ml-1">Show latest 5</button>`;
+                    } else {
+                        doneLimitEl.innerHTML = `Showing latest 5 <button onclick="showAllDone()" class="text-blue-600 hover:underline ml-1">View all ${allDoneTasks.length}</button>`;
+                    }
                 } else {
                     doneLimitEl.classList.add('hidden');
                 }
 
-                // Render done tasks (limited to 5)
+                // Render done tasks
                 doneTasks.forEach(task => {
                     const card = createTaskCard(task);
                     lists.done.appendChild(card);
