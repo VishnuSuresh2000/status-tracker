@@ -628,11 +628,14 @@
                     `).join('');
                 }
 
-                // Mermaid Chart
+                // Mermaid Chart - always show section
                 const flowSection = document.getElementById('flowChartSection');
                 const chartDiv = document.getElementById('mermaidChart');
+                flowSection.classList.remove('hidden');
+                
                 if (task.flow_chart) {
-                    flowSection.classList.remove('hidden');
+                    // Show zoom controls
+                    flowSection.querySelector('.flex.gap-1').classList.remove('hidden');
                     // Clear previous content and reset mermaid
                     chartDiv.innerHTML = '';
                     chartDiv.removeAttribute('data-processed');
@@ -649,7 +652,9 @@
                         chartDiv.innerHTML = `<p class="text-red-500 text-xs">Error rendering chart</p><pre class="text-[10px] overflow-auto mt-2 bg-gray-100 p-2 rounded">${task.flow_chart}</pre>`;
                     }
                 } else {
-                    flowSection.classList.add('hidden');
+                    // Hide zoom controls when no flowchart
+                    flowSection.querySelector('.flex.gap-1').classList.add('hidden');
+                    chartDiv.innerHTML = `<div class="text-center py-6 text-gray-500"><span class="text-2xl">📊</span><p class="text-sm mt-1">No workflow defined</p></div>`;
                 }
 
                 // Action Button Logic
