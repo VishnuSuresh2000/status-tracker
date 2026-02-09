@@ -16,27 +16,7 @@ This file contains MANDATORY instructions for any AI agent interacting with this
 
 ---
 
-## 2. Startup Protocol
-
-**Every time a session starts or the server restarts:**
-
-1. Use the `todoread` tool to check for ongoing work in the Status Tracker
-2. Review any `in_progress` or pending tasks
-3. Review the current task context and history
-
----
-
-## 3. Explicit Authorization
-
-**The agent MUST ask the user for permission before continuing any ongoing work found in the tracker.**
-
-- Do NOT automatically resume work without user confirmation
-- Present the found tasks to the user
-- Wait for explicit approval before proceeding
-
----
-
-## 4. Progress Reporting
+## 2. Progress Reporting
 
 **All progress must be reported via the project's API using authentication.**
 

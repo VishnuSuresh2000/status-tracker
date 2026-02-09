@@ -122,12 +122,14 @@ class TestCreateTaskWithNestedStructure:
         assert data["progress_percent"] > 0
 
     def test_create_task_without_phases(self, client: TestClient, auth_headers: dict):
-        """E-001: Create task with empty phases list fails."""
+        """E-001: Create task with empty phases list fails validation."""
         task_data = {"name": "Empty Task", "priority": "low", "phases": []}
 
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
+        data = response.json()
+
         assert response.status_code == 400
-        assert "at least one phase" in response.json()["detail"].lower()
+        assert "at least one phase" in data["detail"].lower()
 
 
 # ============================================================================
@@ -626,6 +628,7 @@ class TestSystemComments:
         assert len(comments) >= 1
         assert any("created" in c["text"].lower() for c in comments)
 
+
 class TestStatusSync:
     def test_task_status_syncs_with_progress(
         self, client: TestClient, auth_headers: dict
@@ -638,31 +641,33 @@ class TestStatusSync:
                     "name": "Phase 1",
                     "todos": [
                         {"name": "Todo 1", "status": "todo"},
-                        {"name": "Todo 2", "status": "todo"}
-                    ]
+                        {"name": "Todo 2", "status": "todo"},
+                    ],
                 }
-            ]
+            ],
         }
         response = client.post("/tasks/", json=task_data, headers=auth_headers)
         task = response.json()
         task_id = task["id"]
-        
+
         # Initial state (0% progress)
         assert task["status"] == "todo"
         assert task["progress_percent"] == 0
-        
+
         # Move to 50% progress
         todo_id = task["phases"][0]["todos"][0]["id"]
         client.patch(f"/todos/{todo_id}", json={"status": "done"}, headers=auth_headers)
-        
+
         response = client.get(f"/tasks/{task_id}")
         assert response.json()["progress_percent"] == 50
         assert response.json()["status"] == "in_progress"
-        
+
         # Move to 100% progress
         todo_id2 = task["phases"][0]["todos"][1]["id"]
-        client.patch(f"/todos/{todo_id2}", json={"status": "done"}, headers=auth_headers)
-                
+        client.patch(
+            f"/todos/{todo_id2}", json={"status": "done"}, headers=auth_headers
+        )
+
         response = client.get(f"/tasks/{task_id}")
         assert response.json()["progress_percent"] == 100
         assert response.json()["status"] == "done"
