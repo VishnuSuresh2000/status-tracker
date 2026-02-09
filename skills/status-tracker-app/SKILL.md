@@ -99,4 +99,4 @@ Description: Context and goal
 ## References
 
 - [API Documentation](references/api_docs.md): Full endpoint list and data schemas.
-- [ROUTINE.md](../../status-tracker/ROUTINE.md): Mandatory AI agent instructions.
+- [ROUTINE.md](../../ROUTINE.md): Mandatory AI agent instructions.
