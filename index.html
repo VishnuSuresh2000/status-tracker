@@ -185,8 +185,8 @@
         <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto">
             <div class="p-4 sm:p-6 border-b flex justify-between items-start flex-shrink-0">
                 <div>
-                    <h3 id="modalTaskName" class="text-2xl font-bold text-gray-800">Task Details</h3>
-                    <div id="modalTaskMeta" class="flex gap-2 mt-1"></div>
+                    <h3 id="modalTaskName" class="text-lg sm:text-2xl font-bold text-gray-800">Task Details</h3>
+                    <div id="modalTaskMeta" class="flex flex-wrap gap-2 mt-1.5"></div>
                 </div>
                 <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
@@ -465,27 +465,27 @@
 
             const { agentSkills, taskSkills } = parseSkills(task.skills);
             
-            // Agent Skills with label
+            // Agent Skills section - visible label with proper spacing
             const agentSkillsDisplay = agentSkills.length > 0 ?
-                `<div class="mb-2">
-                    <span class="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide mr-1">Agent:</span>
-                    <div class="flex flex-wrap gap-1 mt-0.5 inline-flex">
+                `<div class="mb-3">
+                    <div class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">🤖 Agent Skills</div>
+                    <div class="flex flex-wrap gap-1.5">
                         ${agentSkills.slice(0, 3).map(s => 
-                            `<span class="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">${s.trim()}</span>`
+                            `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] rounded-full border border-indigo-100 font-medium">${s.trim()}</span>`
                         ).join('')}
-                        ${agentSkills.length > 3 ? `<span class="text-xs text-indigo-500 px-1">+${agentSkills.length - 3}</span>` : ''}
+                        ${agentSkills.length > 3 ? `<span class="text-[11px] text-indigo-500 px-1">+${agentSkills.length - 3}</span>` : ''}
                     </div>
                 </div>` : '';
             
-            // Task Skills with label
+            // Task Skills section - visible label with proper spacing  
             const taskSkillsDisplay = taskSkills.length > 0 ?
-                `<div class="mb-2">
-                    <span class="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mr-1">Skills:</span>
-                    <div class="flex flex-wrap gap-1 mt-0.5 inline-flex">
+                `<div class="mb-3">
+                    <div class="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">🎯 Task Skills</div>
+                    <div class="flex flex-wrap gap-1.5">
                         ${taskSkills.slice(0, 3).map(s => 
-                            `<span class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">${s.trim()}</span>`
+                            `<span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] rounded-full border border-amber-100 font-medium">${s.trim()}</span>`
                         ).join('')}
-                        ${taskSkills.length > 3 ? `<span class="text-xs text-amber-500 px-1">+${taskSkills.length - 3}</span>` : ''}
+                        ${taskSkills.length > 3 ? `<span class="text-[11px] text-amber-500 px-1">+${taskSkills.length - 3}</span>` : ''}
                     </div>
                 </div>` : '';
 
@@ -493,8 +493,8 @@
                 ${pingIndicator}
                 ${agentDisplay}
                 <div class="flex justify-between items-start mb-2 gap-2">
-                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 truncate group-hover:text-blue-600 transition-colors text-sm" title="${task.name}">${task.name}</h4>
-                    <span class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${pColor} ml-2 flex-shrink-0">${task.priority || 'medium'}</span>
+                    <h4 class="font-bold text-gray-800 flex-1 min-w-0 truncate group-hover:text-blue-600 transition-colors text-base" title="${task.name}">${task.name}</h4>
+                    <span class="text-xs uppercase font-bold px-2.5 py-1 rounded-full ${pColor} ml-2 flex-shrink-0">${task.priority || 'medium'}</span>
                 </div>
                 
                 ${task.description ? `<p class="text-xs text-gray-500 line-clamp-2 mb-2">${task.description}</p>` : ''}
@@ -503,7 +503,7 @@
                 ${taskSkillsDisplay}
 
                 <div class="mt-auto pt-2">
-                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
                         <span>Progress</span>
                         <span>${progress}%</span>
                     </div>
@@ -557,19 +557,19 @@
                     const { agentSkills, taskSkills } = parseSkills(task.skills);
                     
                     if (agentSkills.length > 0) {
-                        meta.innerHTML += '<div class="mt-2"><span class="text-xs font-bold text-indigo-600 uppercase tracking-wide mr-2">Agent Skills</span>';
+                        meta.innerHTML += '<div class="w-full mt-3"><div class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">🤖 Agent Skills</div><div class="flex flex-wrap gap-1.5">';
                         agentSkills.forEach(skill => {
-                            meta.innerHTML += `<span class="text-xs text-indigo-700 px-2.5 py-1 rounded-full bg-indigo-100 mr-1 font-medium">${skill.trim()}</span>`;
+                            meta.innerHTML += `<span class="text-xs text-indigo-700 px-2 py-1 rounded-full bg-indigo-50 border border-indigo-100 font-medium">${skill.trim()}</span>`;
                         });
-                        meta.innerHTML += '</div>';
+                        meta.innerHTML += '</div></div>';
                     }
                     
                     if (taskSkills.length > 0) {
-                        meta.innerHTML += '<div class="mt-2"><span class="text-xs font-bold text-amber-600 uppercase tracking-wide mr-2">Task Skills</span>';
+                        meta.innerHTML += '<div class="w-full mt-3"><div class="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">🎯 Task Skills</div><div class="flex flex-wrap gap-1.5">';
                         taskSkills.forEach(skill => {
-                            meta.innerHTML += `<span class="text-xs text-amber-700 px-2.5 py-1 rounded-full bg-amber-100 mr-1 font-medium">${skill.trim()}</span>`;
+                            meta.innerHTML += `<span class="text-xs text-amber-700 px-2 py-1 rounded-full bg-amber-50 border border-amber-100 font-medium">${skill.trim()}</span>`;
                         });
-                        meta.innerHTML += '</div>';
+                        meta.innerHTML += '</div></div>';
                     }
                 }
 
