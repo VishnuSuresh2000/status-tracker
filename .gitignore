@@ -63,6 +63,7 @@ data/*.sqlite3
 # Docker
 *.log
 *.pid
+docker-compose.override.yml
 
 # OS files
 Thumbs.db
