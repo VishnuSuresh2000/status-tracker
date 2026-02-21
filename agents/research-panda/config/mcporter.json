@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "brave-scraper": {
+      "baseUrl": "http://brave-scraper-mcp:8080/mcp"
+    }
+  },
+  "imports": []
+}

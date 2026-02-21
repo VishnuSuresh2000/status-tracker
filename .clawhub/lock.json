@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "skills": {
+    "opencode-controller": {
+      "version": "1.0.0",
+      "installedAt": 1771615581770
+    },
+    "brave-search": {
+      "version": "1.0.1",
+      "installedAt": 1770616979892
+    },
+    "kilocli-coding-agent": {
+      "version": "0.0.3",
+      "installedAt": 1770649202452
+    },
+    "gpt": {
+      "version": "1.1.0",
+      "installedAt": 1770744861086
+    }
+  }
+}

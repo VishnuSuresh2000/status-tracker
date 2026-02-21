@@ -1,8 +1,0 @@
-fastapi
-sqlmodel
-uvicorn
-redis
-requests
-pytest
-httpx
-python-dotenv

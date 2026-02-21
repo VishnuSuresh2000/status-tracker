@@ -1,0 +1,248 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.6",
+    "lastTouchedAt": "2026-02-07T06:07:14.246Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-02-07T06:07:14.221Z",
+    "lastRunVersion": "2026.2.6",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "update": {
+    "channel": "stable"
+  },
+  "browser": {
+    "enabled": true,
+    "attachOnly": true,
+    "defaultProfile": "remote",
+    "profiles": {
+      "remote": {
+        "cdpUrl": "http://172.18.0.11:9222",
+        "color": "#FF4500"
+      }
+    }
+  },
+  "auth": {
+    "profiles": {
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
+      },
+      "cerebras:manual": {
+        "provider": "cerebras",
+        "mode": "token"
+      },
+      "groq:manual": {
+        "provider": "groq",
+        "mode": "token"
+      },
+      "google-gemini-cli:vishnusuresh19012000@gmail.com": {
+        "provider": "google-gemini-cli",
+        "mode": "oauth"
+      },
+      "opencode:default": {
+        "provider": "opencode",
+        "mode": "api_key"
+      },
+      "venice:manual": {
+        "provider": "venice",
+        "mode": "token"
+      },
+      "google-gemini-cli:achu00vishnu@gmail.com": {
+        "provider": "google-gemini-cli",
+        "mode": "oauth"
+      },
+      "google-antigravity:vishnusuresh19012000@gmail.com": {
+        "provider": "google-antigravity",
+        "mode": "oauth"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google-gemini-cli/gemini-3-flash-preview",
+        "fallbacks": [
+          "openrouter/arcee-ai/trinity-large-preview:free",
+          "openrouter/z-ai/glm-4.5-air:free",
+          "google-gemini-cli/gemini-3-flash-preview",
+          "cerebras/gpt-oss-120b",
+          "groq/moonshotai/kimi-k2-instruct",
+          "mistral/mistral-large-latest",
+          "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+          "cerebras/zai-glm-4.7",
+          "google-antigravity/claude-opus-4-5-thinking",
+          "google-antigravity/gemini-3-flash-preview",
+          "mistral/codestral-latest",
+          "groq/deepseek-r1-distill-llama-70b"
+        ]
+      },
+      "imageModel": {
+        "primary": "google-antigravity/gemini-3-flash-preview"
+      },
+      "models": {
+        "openrouter/arcee-ai/trinity-large-preview:free": {},
+        "openrouter/z-ai/glm-4.5-air:free": {},
+        "google-gemini-cli/gemini-3-pro-preview": {},
+        "google-gemini-cli/gemini-3-flash-preview": {},
+        "cerebras/gpt-oss-120b": {},
+        "groq/moonshotai/kimi-k2-instruct": {},
+        "mistral/mistral-large-latest": {},
+        "groq/meta-llama/llama-4-maverick-17b-128e-instruct": {},
+        "cerebras/zai-glm-4.7": {},
+        "google-antigravity/claude-opus-4-5-thinking": {},
+        "google-antigravity/gemini-3-flash": {},
+        "google-antigravity/gemini-3-flash-preview": {},
+        "mistral/codestral-latest": {},
+        "groq/deepseek-r1-distill-llama-70b": {}
+      },
+      "workspace": "/home/node/.openclaw/workspace",
+      "userTimezone": "Asia/Kolkata",
+      "timeFormat": "12",
+      "memorySearch": {
+        "enabled": true,
+        "sources": [
+          "memory",
+          "sessions"
+        ],
+        "provider": "gemini",
+        "remote": {
+          "apiKey": "__OPENCLAW_REDACTED__"
+        },
+        "model": "gemini-embedding-001",
+        "store": {
+          "vector": {
+            "enabled": true
+          }
+        },
+        "cache": {
+          "enabled": true
+        }
+      },
+      "compaction": {
+        "mode": "safeguard",
+        "memoryFlush": {
+          "enabled": true
+        }
+      },
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "sandbox": {
+        "mode": "non-main",
+        "workspaceAccess": "none",
+        "scope": "session",
+        "docker": {
+          "image": "openclaw-sandbox-common:bookworm-slim"
+        },
+        "browser": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "tools": {
+    "web": {
+      "search": {
+        "enabled": false
+      },
+      "fetch": {
+        "enabled": true
+      }
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "bash": true,
+    "restart": true
+  },
+  "cron": {
+    "enabled": true
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        },
+        "boot-md": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "web": {
+    "enabled": true
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "botToken": "__OPENCLAW_REDACTED__",
+      "groupPolicy": "allowlist",
+      "streamMode": "partial"
+    }
+  },
+  "canvasHost": {
+    "enabled": true
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "lan",
+    "controlUi": {
+      "allowInsecureAuth": true
+    },
+    "auth": {
+      "mode": "token",
+      "token": "__OPENCLAW_REDACTED__"
+    },
+    "trustedProxies": [
+      "172.18.0.1",
+      "172.18.0.3"
+    ],
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "bun"
+    },
+    "entries": {
+      "apple-notes": {
+        "enabled": true
+      },
+      "coding-agent": {
+        "enabled": true
+      },
+      "mcporter": {
+        "enabled": true
+      },
+      "nano-banana-pro": {
+        "apiKey": "__OPENCLAW_REDACTED__"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      },
+      "google-antigravity-auth": {
+        "enabled": true
+      },
+      "google-gemini-cli-auth": {
+        "enabled": true
+      }
+    }
+  }
+}
